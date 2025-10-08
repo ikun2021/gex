@@ -1,7 +1,7 @@
 package response
 
 import (
-	"github.com/luxun9527/gex/common/errs"
+	"github.com/ikun2021/gex/common/errs"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"

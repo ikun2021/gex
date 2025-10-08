@@ -1,6 +1,6 @@
 syntax = "proto3";
 package commonEnum;
-option go_package = "github.com/luxun9527/gex/common/proto/enum;enum";
+option go_package = "github.com/ikun2021/gex/common/proto/enum;enum";
 //这个一个bug 自己如果有修改用这个，如果别人导入你的包，用上面的
 //option go_package = "./common/proto/enum;enum";
 //买卖方向

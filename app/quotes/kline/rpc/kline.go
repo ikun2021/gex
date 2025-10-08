@@ -2,12 +2,12 @@ package main
 
 import (
 	"flag"
-	"github.com/luxun9527/gex/app/quotes/kline/rpc/internal/config"
-	"github.com/luxun9527/gex/app/quotes/kline/rpc/internal/logic"
-	"github.com/luxun9527/gex/app/quotes/kline/rpc/internal/server"
-	"github.com/luxun9527/gex/app/quotes/kline/rpc/internal/svc"
-	"github.com/luxun9527/gex/app/quotes/kline/rpc/pb"
-	"github.com/luxun9527/gex/common/pkg/flagx"
+	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/config"
+	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/logic"
+	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/server"
+	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/svc"
+	"github.com/ikun2021/gex/app/quotes/kline/rpc/pb"
+	"github.com/ikun2021/gex/common/pkg/flagx"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"

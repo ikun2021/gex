@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/luxun9527/gex/common/pkg/etcd"
-	commongorm "github.com/luxun9527/gex/common/pkg/gorm"
+	"github.com/ikun2021/gex/common/pkg/etcd"
+	commongorm "github.com/ikun2021/gex/common/pkg/gorm"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/rest"
 )

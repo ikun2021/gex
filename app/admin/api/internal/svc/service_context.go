@@ -1,11 +1,11 @@
 package svc
 
 import (
-	"github.com/luxun9527/gex/app/admin/api/internal/config"
-	adminQuery "github.com/luxun9527/gex/app/admin/api/internal/dao/admin/query"
-	matchQuery "github.com/luxun9527/gex/app/admin/api/internal/dao/match/query"
-	"github.com/luxun9527/gex/common/errs"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/admin/api/internal/config"
+	adminQuery "github.com/ikun2021/gex/app/admin/api/internal/dao/admin/query"
+	matchQuery "github.com/ikun2021/gex/app/admin/api/internal/dao/match/query"
+	"github.com/ikun2021/gex/common/errs"
+	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	clientv3 "go.etcd.io/etcd/client/v3"

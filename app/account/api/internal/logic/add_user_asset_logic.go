@@ -2,12 +2,12 @@ package logic
 
 import (
 	"context"
-	"github.com/luxun9527/gex/app/account/rpc/accountservice"
+	"github.com/ikun2021/gex/app/account/rpc/accountservice"
 	logger "github.com/luxun9527/zlog"
 	"github.com/spf13/cast"
 
-	"github.com/luxun9527/gex/app/account/api/internal/svc"
-	"github.com/luxun9527/gex/app/account/api/internal/types"
+	"github.com/ikun2021/gex/app/account/api/internal/svc"
+	"github.com/ikun2021/gex/app/account/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

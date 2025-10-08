@@ -1,7 +1,7 @@
 package engine
 
 import (
-	enum "github.com/luxun9527/gex/common/proto/enum"
+	enum "github.com/ikun2021/gex/common/proto/enum"
 	"github.com/shopspring/decimal"
 )
 

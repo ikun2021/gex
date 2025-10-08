@@ -3,15 +3,15 @@ package logic
 import (
 	"context"
 	"errors"
-	"github.com/luxun9527/gex/app/account/rpc/pb"
-	"github.com/luxun9527/gex/common/errs"
-	"github.com/luxun9527/gex/common/proto/define"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/account/rpc/pb"
+	"github.com/ikun2021/gex/common/errs"
+	"github.com/ikun2021/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"gorm.io/gorm"
 
 	"github.com/gookit/goutil/strutil"
-	"github.com/luxun9527/gex/app/account/rpc/internal/svc"
+	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

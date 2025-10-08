@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/luxun9527/gex/common/pkg/validatorx"
+	"github.com/ikun2021/gex/common/pkg/validatorx"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
 
-	"github.com/luxun9527/gex/app/order/api/internal/config"
-	"github.com/luxun9527/gex/app/order/api/internal/handler"
-	"github.com/luxun9527/gex/app/order/api/internal/svc"
+	"github.com/ikun2021/gex/app/order/api/internal/config"
+	"github.com/ikun2021/gex/app/order/api/internal/handler"
+	"github.com/ikun2021/gex/app/order/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"

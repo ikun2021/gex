@@ -2,11 +2,11 @@ package logic
 
 import (
 	"context"
-	"github.com/luxun9527/gex/app/account/rpc/internal/dao/model"
-	"github.com/luxun9527/gex/app/account/rpc/internal/dao/query"
-	"github.com/luxun9527/gex/app/account/rpc/internal/svc"
-	matchMq "github.com/luxun9527/gex/common/proto/mq/match"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/account/rpc/internal/dao/model"
+	"github.com/ikun2021/gex/app/account/rpc/internal/dao/query"
+	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
+	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
+	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm/clause"

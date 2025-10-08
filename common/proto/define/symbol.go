@@ -1,8 +1,8 @@
 package define
 
 import (
-	"github.com/luxun9527/gex/common/pkg/confx"
-	"github.com/luxun9527/gex/common/pkg/etcd"
+	"github.com/ikun2021/gex/common/pkg/confx"
+	"github.com/ikun2021/gex/common/pkg/etcd"
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"

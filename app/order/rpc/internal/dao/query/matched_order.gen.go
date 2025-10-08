@@ -16,7 +16,7 @@ import (
 
 	"gorm.io/plugin/dbresolver"
 
-	"github.com/luxun9527/gex/app/order/rpc/internal/dao/model"
+	"github.com/ikun2021/gex/app/order/rpc/internal/dao/model"
 )
 
 func newMatchedOrder(db *gorm.DB, opts ...gen.DOOption) matchedOrder {

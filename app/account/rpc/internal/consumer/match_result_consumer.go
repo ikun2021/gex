@@ -3,9 +3,9 @@ package consumer
 import (
 	"context"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/luxun9527/gex/app/account/rpc/internal/logic"
-	"github.com/luxun9527/gex/app/account/rpc/internal/svc"
-	matchMq "github.com/luxun9527/gex/common/proto/mq/match"
+	"github.com/ikun2021/gex/app/account/rpc/internal/logic"
+	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
+	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"

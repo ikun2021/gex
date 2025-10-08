@@ -2,12 +2,12 @@ package svc
 
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/luxun9527/gex/app/account/rpc/internal/config"
-	"github.com/luxun9527/gex/app/account/rpc/internal/dao/query"
-	"github.com/luxun9527/gex/common/pkg/confx"
-	pulsarConfig "github.com/luxun9527/gex/common/pkg/pulsar"
-	"github.com/luxun9527/gex/common/proto/define"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/account/rpc/internal/config"
+	"github.com/ikun2021/gex/app/account/rpc/internal/dao/query"
+	"github.com/ikun2021/gex/common/pkg/confx"
+	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
+	"github.com/ikun2021/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"

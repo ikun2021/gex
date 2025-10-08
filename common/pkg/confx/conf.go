@@ -2,7 +2,7 @@ package confx
 
 import (
 	"context"
-	"github.com/luxun9527/gex/common/pkg/etcd"
+	"github.com/ikun2021/gex/common/pkg/etcd"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"

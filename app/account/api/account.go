@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/luxun9527/gex/app/account/api/internal/config"
-	"github.com/luxun9527/gex/app/account/api/internal/handler"
-	"github.com/luxun9527/gex/app/account/api/internal/svc"
+	"github.com/ikun2021/gex/app/account/api/internal/config"
+	"github.com/ikun2021/gex/app/account/api/internal/handler"
+	"github.com/ikun2021/gex/app/account/api/internal/svc"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 

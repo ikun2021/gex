@@ -2,12 +2,12 @@
 
 在线体验 斥巨资搞了台机器  http://47.113.223.16 
 
-账户密码在这 https://github.com/luxun9527/gex/blob/main/resource/users.txt
+账户密码在这 https://github.com/ikun2021/gex/blob/main/resource/users.txt
 
 
-后端：https://github.com/luxun9527/gex   您的star,点赞评论是我更新的动力
+后端：https://github.com/ikun2021/gex   您的star,点赞评论是我更新的动力
 
-前端：https://github.com/luxun9527/gex-ui
+前端：https://github.com/ikun2021/gex-ui
 
 基于go-zero 实现一个数字货币交易平台现货交易的基本功能。
 

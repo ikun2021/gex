@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"github.com/luxun9527/gex/app/account/rpc/internal/config"
-	"github.com/luxun9527/gex/app/account/rpc/internal/consumer"
-	"github.com/luxun9527/gex/app/account/rpc/internal/server"
-	"github.com/luxun9527/gex/app/account/rpc/internal/svc"
-	"github.com/luxun9527/gex/app/account/rpc/pb"
+	"github.com/ikun2021/gex/app/account/rpc/internal/config"
+	"github.com/ikun2021/gex/app/account/rpc/internal/consumer"
+	"github.com/ikun2021/gex/app/account/rpc/internal/server"
+	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
+	"github.com/ikun2021/gex/app/account/rpc/pb"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 

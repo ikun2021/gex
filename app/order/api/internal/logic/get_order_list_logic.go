@@ -2,13 +2,13 @@ package logic
 
 import (
 	"context"
-	orderpb "github.com/luxun9527/gex/app/order/rpc/pb"
-	enum "github.com/luxun9527/gex/common/proto/enum"
+	orderpb "github.com/ikun2021/gex/app/order/rpc/pb"
+	enum "github.com/ikun2021/gex/common/proto/enum"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/luxun9527/gex/app/order/api/internal/svc"
-	"github.com/luxun9527/gex/app/order/api/internal/types"
+	"github.com/ikun2021/gex/app/order/api/internal/svc"
+	"github.com/ikun2021/gex/app/order/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

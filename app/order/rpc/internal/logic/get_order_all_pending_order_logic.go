@@ -2,12 +2,12 @@ package logic
 
 import (
 	"context"
-	"github.com/luxun9527/gex/app/order/rpc/internal/dao/model"
-	"github.com/luxun9527/gex/common/proto/enum"
-	commonUtils "github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/order/rpc/internal/dao/model"
+	"github.com/ikun2021/gex/common/proto/enum"
+	commonUtils "github.com/ikun2021/gex/common/utils"
 
-	"github.com/luxun9527/gex/app/order/rpc/internal/svc"
-	"github.com/luxun9527/gex/app/order/rpc/pb"
+	"github.com/ikun2021/gex/app/order/rpc/internal/svc"
+	"github.com/ikun2021/gex/app/order/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

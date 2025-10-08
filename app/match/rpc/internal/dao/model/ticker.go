@@ -1,9 +1,9 @@
 package model
 
 import (
-	"github.com/luxun9527/gex/common/proto/define"
-	"github.com/luxun9527/gex/common/proto/ws"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/proto/ws"
+	"github.com/ikun2021/gex/common/utils"
 	"github.com/shopspring/decimal"
 )
 
@@ -18,7 +18,6 @@ type Ticker struct {
 	Range      decimal.Decimal //变化百分比
 	PriceDelta decimal.Decimal //变化数量
 }
-
 
 func (t *Ticker) CastToTickerWsData(symbolInfo define.SymbolInfo) ws.Ticker {
 	return ws.Ticker{

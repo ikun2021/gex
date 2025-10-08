@@ -2,8 +2,8 @@ package test
 
 import (
 	"context"
-	"github.com/luxun9527/gex/app/order/rpc/pb"
-	"github.com/luxun9527/gex/common/proto/enum"
+	"github.com/ikun2021/gex/app/order/rpc/pb"
+	"github.com/ikun2021/gex/common/proto/enum"
 	"google.golang.org/grpc"
 	"log"
 	"testing"

@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/luxun9527/gex/app/match/rpc/internal/dao/model"
-	"github.com/luxun9527/gex/app/match/rpc/internal/svc"
-	"github.com/luxun9527/gex/common/errs"
-	"github.com/luxun9527/gex/common/proto/define"
-	"github.com/luxun9527/gex/common/utils"
+	"github.com/ikun2021/gex/app/match/rpc/internal/dao/model"
+	"github.com/ikun2021/gex/app/match/rpc/internal/svc"
+	"github.com/ikun2021/gex/common/errs"
+	"github.com/ikun2021/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 
-	"github.com/luxun9527/gex/app/match/rpc/pb"
+	"github.com/ikun2021/gex/app/match/rpc/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )

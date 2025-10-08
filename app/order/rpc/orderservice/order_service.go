@@ -6,7 +6,7 @@ package orderservice
 import (
 	"context"
 
-	"github.com/luxun9527/gex/app/order/rpc/pb"
+	"github.com/ikun2021/gex/app/order/rpc/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

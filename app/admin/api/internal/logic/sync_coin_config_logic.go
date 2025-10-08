@@ -2,11 +2,11 @@ package logic
 
 import (
 	"context"
-	"github.com/luxun9527/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/proto/define"
 	"gopkg.in/yaml.v3"
 
-	"github.com/luxun9527/gex/app/admin/api/internal/svc"
-	"github.com/luxun9527/gex/app/admin/api/internal/types"
+	"github.com/ikun2021/gex/app/admin/api/internal/svc"
+	"github.com/ikun2021/gex/app/admin/api/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
