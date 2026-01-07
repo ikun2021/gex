@@ -32,9 +32,9 @@ message NewOrderOperate{
   //价格
   string price=7;
   //订单数量
-  string qty=4;
+  string base_amount=4;
   //订单金额 计价币数量
-  string amount=5;
+  string quote_amount=5;
   //订单类型
   commonEnum.OrderType order_type=6;
   //交易对id
@@ -64,13 +64,13 @@ message OrderResp{
   //订单id
   string order_id=1;
   //已经成交数量
-  string filled_qty=2;
+  string filled_base_amount=2;
   //未成交的数量
-  string un_filled_qty=7;
+  string un_filled_base_amount=7;
   //已经成交金额
-  string filled_amount=3;
+  string filled_quote_amount=3;
   //未成交的金额
-  string un_filled_amount=4;
+  string un_filled_quote_amount=4;
   //订单状态
   commonEnum.OrderStatus order_status=5;
   //解冻金额
@@ -96,11 +96,11 @@ message MatchResult{
   //一次撮合记录匹配记录
   message MatchedRecord{
     //撮合匹配的数量
-    string qty =4;
+    string base_amount =4;
     //撮合价格
     string price=5;
     //撮合的金额
-    string amount=10;
+    string quote_amount=10;
     //本次匹配的id
     string match_sub_id=6;
     //taker订单
@@ -132,7 +132,7 @@ message CancelResp{
   //解冻币种id
    int32 coin_id=2;
   //数量
-  string qty=3;
+  string amount=3;
   //用户id
   int64 uid=4;
 }

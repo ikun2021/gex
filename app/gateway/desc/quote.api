@@ -1,0 +1,131 @@
+syntax = "v1"
+
+info(
+	title: "行情"
+	desc: "行情"
+	author: "xx"
+	email: "12123231@163.com"
+	version: "v1"
+)
+type (
+	KlineListReq {
+		StartTime int64 `json:"start_time"` //开始时间 秒时间戳
+
+		EndTime int64 `json:"end_time"` //结束时间
+
+		KlineType int32 `json:"kline_type"` //k线类型
+
+		Symbol string `json:"symbol"` //交易对
+	}
+	Kline {
+		Open string `json:"open"` //开
+
+		High string `json:"high"` //高
+
+		Low string `json:"low"` //低
+
+		Close string `json:"close"` //收
+
+		Amount string `json:"amount"` //成交量
+
+		Volume string `json:"volume"` //成交额
+
+		StartTime int64 `json:"start_time"` //开始时间
+
+		EndTime int64 `json:"end_time"` //结束时间
+
+		PriceRange string `json:"price_range"` //涨跌幅
+
+		Symbol string `json:"symbol"` //交易对
+	}
+	KlineListResp {
+		KlineList []*Kline `json:"kline_list"`
+	}
+)
+
+type (
+	GetDepthListReq {
+		Symbol string `json:"symbol"` //交易对
+
+		Level int32 `json:"level"` //档位
+	}
+	Position {
+		Qty string `json:"qty"` //数量
+
+		Price string `json:"price"` //价格
+
+		Amount string `json:"amount"` //金额
+	}
+	GetDepthListResp {
+		Version string `json:"version"` //当前版本号
+
+		Asks []*Position `json:"asks"` //卖盘
+
+		Bids []*Position `json:"bids"` //买盘
+	}
+)
+
+type (
+	GetTickerListReq {
+		Symbol string `json:"symbol"` //交易对
+	}
+	Ticker {
+		LastPrice string `json:"last_price"` //最新价
+
+		High string `json:"high"` //高
+
+		Low string `json:"low"` //低
+
+		Amount string `json:"amount"` //成交量
+
+		Volume string `json:"volume"` //成交额
+
+		PriceRange string `json:"price_range"` //涨跌幅
+
+		Last24Price string `json:"last24_price"` //24小时前的价格
+
+		Symbol string `json:"symbol"` //交易对
+	}
+	GetTickerListResp {
+		TickerList []*Ticker `json:"ticker_list"`
+	}
+)
+type (
+	GetTickReq {
+		Symbol string `json:"symbol"`         //交易对
+		Limit  int32  `json:"limit,optional"` //获取多少条
+	}
+
+	TickInfo {
+		Price        string `json:"price"`  //价格
+		Qty          string `json:"qty"`    //数量
+		Amount       string `json:"amount"` //金额
+		Timestamp    int64  `json:"timestamp"`
+		Symbol       string `json:"symbol"`
+		TakerIsBuyer bool   `json:"taker_is_buyer"`
+	}
+	GetTickResp {
+		TickList []*TickInfo `json:"tick_list"`
+	}
+)
+
+@server(
+	prefix: /quotes/v1
+	group: quote
+)
+
+service gateway {
+	@doc "获取k线"
+	@handler GetKlineList
+	post /get_kline_list (KlineListReq) returns (KlineListResp)
+	@doc "获取深度"
+	@handler GetDepthList
+	post /get_depth_list (GetDepthListReq) returns (GetDepthListResp)
+	@doc "获取ticker"
+	@handler GetTickerList
+	post /get_ticker_list (GetTickerListReq) returns (GetTickerListResp)
+	@doc "获取tick成交"
+	@handler GetTickList
+	post /get_tick_list (GetTickReq) returns (GetTickResp)
+
+}

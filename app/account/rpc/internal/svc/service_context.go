@@ -10,11 +10,13 @@ import (
 	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stores/redis"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"gopkg.in/yaml.v3"
+	"github.com/redis/go-redis/v9"
+
 	"sync"
+	"time"
 )
 
 type ServiceContext struct {
@@ -22,8 +24,9 @@ type ServiceContext struct {
 	Query             *query.Query
 	MatchConsumerList []pulsar.Consumer
 	JwtClient         *utils.JWT
-	RedisClient       *redis.Redis
 	Coins             *sync.Map
+	RedisCli          *redis.Client
+	MatchProducer     pulsar.Producer
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -133,6 +136,18 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		consumers = append(consumers, consumer)
 		return true
 	})
+
+	topic := pulsarConfig.Topic{
+		Tenant:    pulsarConfig.PublicTenant,
+		Namespace: pulsarConfig.GexNamespace,
+		//	Topic:     pulsarConfig.MatchSourceTopic + "_" + c.SymbolInfo.SymbolName,
+	}
+	producer, err := client.CreateProducer(pulsar.ProducerOptions{
+		Topic:           topic.BuildTopic(),
+		SendTimeout:     10 * time.Second,
+		DisableBatching: true,
+	})
+
 	q := query.Use(c.GormConf.MustNewGormClient())
 	sc := &ServiceContext{
 		Config:            c,
@@ -141,6 +156,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		JwtClient:         utils.NewJWT(),
 		RedisClient:       redis.MustNewRedis(c.RedisConf),
 		Coins:             &coinConfig,
+		MatchProducer:     producer,
 	}
 	return sc
 }

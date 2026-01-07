@@ -50,6 +50,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/add_user_asset",
 					Handler: AddUserAssetHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/create_order",
+					Handler: CreateOrderHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/cancel_order",
+					Handler: CancelOrderHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/get_order_list",
+					Handler: GetOrderListHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithPrefix("/account/v1"),
