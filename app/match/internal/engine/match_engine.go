@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/match/rpc/internal/config"
+	"github.com/ikun2021/gex/app/match/internal/config"
 	enum "github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
@@ -16,7 +16,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stringx"
 	"google.golang.org/protobuf/proto"
-	"log"
 	"math"
 	"time"
 )
@@ -29,7 +28,6 @@ type MatchEngine struct {
 	bestAsk          decimal.Decimal //卖一价
 	baseCoinMinUnit  decimal.Decimal
 	quoteCoinMinUnit decimal.Decimal
-	depthHandler     *DepthHandler
 	c                *config.Config
 	producer         pulsar.Producer
 	proxyClient      ws.ProxyClient
@@ -70,28 +68,25 @@ type CancelResp struct {
 	Uid int64
 }
 
-func (mr *MatchResult) String() {
-	fmt.Printf("============================================================\n")
-	fmt.Printf("matchID=%v cancelOrderID=%v\n", mr.MatchID, mr.CancelResp)
-	for _, v := range mr.MatchedRecords {
-		fmt.Printf("matchID=%v matchedRecord Price=%v qty=%v QuoteAmount=%v\n ", v.MatchedRecordID, v.Price, v.Qty, v.Amount)
-		fmt.Printf("taker=%+v\n", v.Taker)
-		fmt.Printf("maker=%+v\n", v.Maker)
-	}
-	fmt.Printf("============================================================\n")
-
+type AcceptedResp struct {
+	//取消订单的id，如果不为空则表示取消订单。
+	CancelId int64
+	//币种id 取消买单则为计价币id，取消卖单则为基础币id
+	CoinId int32
+	//数量 取消买单则为计价币数量，取消卖单则为基础币数量
+	Amount string
+	//用户id
+	Uid int64
 }
 
-func NewMatchEngine(c *config.Config, producer pulsar.Producer, proxyClient ws.ProxyClient) *MatchEngine {
+func NewMatchEngine(c *config.Config, producer pulsar.Producer) *MatchEngine {
 	me := &MatchEngine{
-		asks:         NewOrderBook(enum.Side_Sell),
-		bids:         NewOrderBook(enum.Side_Buy),
-		bestBid:      utils.DecimalZeroMaxPrec,
-		bestAsk:      utils.DecimalZeroMaxPrec,
-		depthHandler: NewDepthHandler(0, c, proxyClient),
-		c:            c,
-		producer:     producer,
-		proxyClient:  proxyClient,
+		asks:     NewOrderBook(enum.Side_Sell),
+		bids:     NewOrderBook(enum.Side_Buy),
+		bestBid:  utils.DecimalZeroMaxPrec,
+		bestAsk:  utils.DecimalZeroMaxPrec,
+		c:        c,
+		producer: producer,
 	}
 	return me
 }
@@ -248,13 +243,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 		m.updateBestBid()
 	}
 	//更新深度数据
-	for _, record := range matchedResult.MatchedRecords {
-		p := &position{
-			price: record.Price,
-			qty:   record.Qty,
-		}
-		m.depthHandler.updateDepth(p, enum.Side_Buy, Delete, m.currentSeqId)
-	}
+
 	matchedResult.MatchTime = time.Now().UnixNano()
 	matchedResult.MatchID = cast.ToString(idgen.NextId())
 	m.SendMatchResult(matchedResult)
@@ -391,13 +380,7 @@ LOOP:
 		m.updateBestAsk()
 	}
 	//更新深度数据
-	for _, record := range matchedResult.MatchedRecords {
-		p := &position{
-			price: record.Price,
-			qty:   record.Qty,
-		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, m.currentSeqId)
-	}
+
 	matchedResult.MatchTime = time.Now().UnixNano()
 	//m.Next <- matchedResult
 	if len(matchedResult.MatchedRecords) > 0 {
@@ -525,22 +508,10 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 	}
 	//如果taker还是部分匹配，将订单加入的买盘中
 	if takerOrder.OrderStatus == enum.OrderStatus_PartFilled {
-		m.addOrder(takerOrder)
-		p := &position{
-			price: takerOrder.Price,
-			qty:   takerOrder.UnfilledBaseAmount,
-		}
-		m.depthHandler.updateDepth(p, enum.Side_Buy, Add, m.currentSeqId)
-	}
-	//更新深度数据
-	for _, record := range matchedResult.MatchedRecords {
-		p := &position{
-			price: record.Price,
-			qty:   record.Qty,
-		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, m.currentSeqId)
 
 	}
+	//更新深度数据
+
 	matchedResult.MatchTime = time.Now().UnixNano()
 	matchedResult.MatchID = cast.ToString(idgen.NextId())
 	//发送撮合结果
@@ -654,24 +625,12 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 	if takerOrder.OrderStatus == enum.OrderStatus_PartFilled {
 
 		m.addOrder(takerOrder)
-		p := &position{
-			price: takerOrder.Price,
-			qty:   takerOrder.UnfilledBaseAmount,
-		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Add, m.currentSeqId)
+
 	}
 	//更新深度数据
-	for _, record := range matchedResult.MatchedRecords {
-		p := &position{
-			price: record.Price,
-			qty:   record.Qty,
-		}
-		log.Printf("%+v", p.castToPosition(5, 6))
-		m.depthHandler.updateDepth(p, enum.Side_Buy, Delete, m.currentSeqId)
-	}
+
 	matchedResult.MatchTime = time.Now().UnixNano()
 	matchedResult.MatchID = cast.ToString(idgen.NextId())
-	//m.Next <- matchedResult
 	m.SendMatchResult(matchedResult)
 
 }
@@ -709,11 +668,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		order.BaseAmount = orderDetail.BaseAmount
 		//订单簿删除订单
 		m.cancelOrder(order)
-		//更新盘口深度
-		m.depthHandler.updateDepth(&position{
-			price: order.Price,
-			qty:   order.UnfilledBaseAmount,
-		}, order.Side, Delete, m.currentSeqId)
+
 		//发送取消订单消息
 
 		coinId, qty := m.c.SymbolInfo.BaseCoinID, order.UnfilledBaseAmount.String()
@@ -744,10 +699,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 			} else {
 				m.addOrder(order)
 				//更新盘口深度
-				m.depthHandler.updateDepth(&position{
-					price: order.Price,
-					qty:   order.UnfilledBaseAmount,
-				}, order.Side, Add, m.currentSeqId)
+
 			}
 		//卖单市价单
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_MO:
@@ -759,18 +711,12 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 			} else {
 				m.addOrder(order)
 				//更新盘口深度
-				m.depthHandler.updateDepth(&position{
-					price: order.Price,
-					qty:   order.UnfilledBaseAmount,
-				}, order.Side, Add, m.currentSeqId)
+
 			}
 		}
 		logx.Debugf(" bestBid = %v bestAsk=%v", m.bestBid, m.bestAsk)
 	}
 
-}
-func (m *MatchEngine) GetDepth(level int32) DepthData {
-	return m.depthHandler.getDepth(level)
 }
 
 // SendMatchResult 发送撮合结果，这个操作不异步。

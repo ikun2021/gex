@@ -6,9 +6,7 @@ package account
 import (
 	"github.com/ikun2021/gex/app/gateway/internal/logic/account"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
-	"github.com/ikun2021/gex/common/errs"
 	"github.com/ikun2021/gex/common/pkg/response"
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"net/http"
 )
 

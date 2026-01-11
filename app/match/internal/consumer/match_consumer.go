@@ -2,8 +2,11 @@ package consumer
 
 import (
 	"context"
-	"github.com/ikun2021/gex/app/match/rpc/internal/engine"
-	"github.com/ikun2021/gex/app/match/rpc/internal/svc"
+	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/ikun2021/gex/app/match/internal/engine"
+	"github.com/ikun2021/gex/app/match/internal/svc"
+	"github.com/ikun2021/gex/common/defines"
+	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
@@ -14,59 +17,67 @@ import (
 
 func InitMatchConsumer(sc *svc.ServiceContext) {
 	ctx := context.Background()
-	go func() {
-		for {
-			message, err := sc.MatchConsumer.Receive(ctx)
+
+	for _, v := range sc.Config.Symbol {
+		go func(symbol models.Symbol) {
+			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
+				Topic:  defines.MatchTopicPrefix + symbol.Name,
+				Topics: nil,
+			})
 			if err != nil {
-				logx.Errorw("receive message fail", logger.ErrorField(err))
-				continue
+				logx.Severef("init match consumer error:%v", err)
 			}
-			var matchReq matchMq.MatchReq
-			if err := proto.Unmarshal(message.Payload(), &matchReq); err != nil {
-				logx.Errorw("unmarshal message fail", logger.ErrorField(err))
-				continue
-			}
-			logx.Infow("receive message failed", logx.Field("data", &matchReq))
-			switch operate := matchReq.Operate.(type) {
-			case *matchMq.MatchReq_NewOrder:
-				if operate.NewOrder.SequenceId <= sc.InitOrderPrimaryID {
-					logx.Sloww("receive invalid order ", logx.Field("currentSequenceId", operate.NewOrder.SequenceId), logx.Field("InitOrderPrimaryID", sc.InitOrderPrimaryID))
+			for {
+				message, err := consumer.Receive(ctx)
+				if err != nil {
+					logx.Errorw("receive message fail", logger.ErrorField(err))
 					continue
 				}
-				order := &engine.Order{
-					Uid:                 operate.NewOrder.Uid,
-					OrderID:             operate.NewOrder.OrderId,
-					SequenceId:          operate.NewOrder.SequenceId,
-					CreateTime:          0,
-					IsCancel:            false,
-					Price:               utils.NewFromStringMaxPrec(operate.NewOrder.Price),
-					BaseAmount:          utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
-					OrderType:           operate.NewOrder.OrderType,
-					QuoteAmount:         utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
-					Side:                operate.NewOrder.Side,
-					OrderStatus:         enum.OrderStatus_NewCreated,
-					UnfilledBaseAmount:  utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
-					FilledBaseAmount:    utils.DecimalZeroMaxPrec,
-					UnfilledQuoteAmount: utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
-					FilledQuoteAmount:   utils.DecimalZeroMaxPrec,
+				var matchReq matchMq.MatchReq
+				if err := proto.Unmarshal(message.Payload(), &matchReq); err != nil {
+					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
+					continue
 				}
-				sc.MatchEngine.HandleOrder(order)
-			case *matchMq.MatchReq_Cancel:
-				order := &engine.Order{
-					OrderID:    "",
-					SequenceId: operate.Cancel.Id,
-					CreateTime: 0,
-					IsCancel:   true,
-					Side:       operate.Cancel.Side,
-					Uid:        0,
-					OrderType:  operate.Cancel.OrderType,
-					Price:      utils.NewFromStringMaxPrec(operate.Cancel.Price),
+				logx.Infow("receive message failed", logx.Field("data", &matchReq))
+				switch operate := matchReq.Operate.(type) {
+				case *matchMq.MatchReq_NewOrder:
+
+					order := &engine.Order{
+						Uid:                 operate.NewOrder.Uid,
+						OrderID:             operate.NewOrder.OrderId,
+						SequenceId:          operate.NewOrder.SequenceId,
+						CreateTime:          0,
+						IsCancel:            false,
+						Price:               utils.NewFromStringMaxPrec(operate.NewOrder.Price),
+						BaseAmount:          utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
+						OrderType:           operate.NewOrder.OrderType,
+						QuoteAmount:         utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
+						Side:                operate.NewOrder.Side,
+						OrderStatus:         enum.OrderStatus_NewCreated,
+						UnfilledBaseAmount:  utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
+						FilledBaseAmount:    utils.DecimalZeroMaxPrec,
+						UnfilledQuoteAmount: utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
+						FilledQuoteAmount:   utils.DecimalZeroMaxPrec,
+					}
+					sc.MatchEngine.HandleOrder(order)
+				case *matchMq.MatchReq_Cancel:
+					order := &engine.Order{
+						OrderID:    "",
+						SequenceId: operate.Cancel.Id,
+						CreateTime: 0,
+						IsCancel:   true,
+						Side:       operate.Cancel.Side,
+						Uid:        0,
+						OrderType:  operate.Cancel.OrderType,
+						Price:      utils.NewFromStringMaxPrec(operate.Cancel.Price),
+					}
+					sc.MatchEngine.HandleOrder(order)
 				}
-				sc.MatchEngine.HandleOrder(order)
+				if err := sc.MatchConsumer.Ack(message); err != nil {
+					logx.Errorw("consumer message failed", logger.ErrorField(err))
+				}
 			}
-			if err := sc.MatchConsumer.Ack(message); err != nil {
-				logx.Errorw("consumer message failed", logger.ErrorField(err))
-			}
-		}
-	}()
+		}(v)
+	}
+
 }

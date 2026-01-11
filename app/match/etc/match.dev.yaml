@@ -1,14 +1,29 @@
-Name: AccountApi
-Host: 0.0.0.0
-Port: 20014
-TimeOut: 10000
+Name: match
+ListenOn: 0.0.0.0:20003
+Timeout: 5000
+Symbol:
+  - Name: IKUN_BTC
+    Id: 1
+  - Name: IKUN_ETH
+    Id: 2
+Coin:
+  - Name: IKUN
+    Id: 1
+    Precision: 6
+  - Name: BTC
+    Id: 2
+    Precision: 8
+  - Name: ETH
+    Id: 3
+    Precision: 8
 
-AccountRpcConf:
-  etcd:
-    Key: accountRpc
-    Hosts:
-      - etcd:2379
-  NonBlock: true
+etcdRegisterConf:
+  etcdConf:
+    endpoints: [192.168.2.159:2379]
+  key: match
+PulsarConfig:
+  hosts:
+    - 192.168.2.159:6650
 LoggerConfig:
   level: debug  #日志等级 debug info warn error
   stacktrace: true #默认为true 在error级别及以上显示堆栈
@@ -33,8 +48,8 @@ LoggerConfig:
     chatID: 0 # tg填chatID 其他不用填
     flushSec: 3 # 刷新间隔单位为秒 开发测试调小一点，生产环境调大一点
     maxCount: 20 #  最大缓存数量 达到刷新间隔或最大记录数 触发发送  开发测试调小一点，生产环境调大一点
-    level: warn # 指定上报级别 达到刷新间隔或最大记录数 触发发送  开发测试调小一点，生产环境调大一点
-
-LanguageEtcdConf:
-  Endpoints: ["etcd:2379"]
-  DialTimeout: 5
+    level: warn # 指定上报级别
+RedisConf:
+  Host: redis:6379
+  Type: node
+  PingTimeout: 5s
