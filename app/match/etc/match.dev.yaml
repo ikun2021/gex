@@ -4,8 +4,16 @@ Timeout: 5000
 Symbol:
   - Name: IKUN_BTC
     Id: 1
+    BaseCoin: IKUN
+    QuoteCoin: BTC
+    QuoteCoinId: 1
+    BaseCoinId: 2
   - Name: IKUN_ETH
     Id: 2
+    BaseCoin: IKUN
+    QuoteCoin: ETH
+    QuoteCoinId: 1
+    BaseCoinId: 2
 Coin:
   - Name: IKUN
     Id: 1

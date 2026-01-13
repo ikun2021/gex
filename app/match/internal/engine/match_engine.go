@@ -2,9 +2,10 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/config"
+	"github.com/ikun2021/gex/common/defines"
+	"github.com/ikun2021/gex/common/models"
 	enum "github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
@@ -16,23 +17,21 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stringx"
 	"google.golang.org/protobuf/proto"
-	"math"
 	"time"
 )
 
 // MatchEngine 撮合引擎
 type MatchEngine struct {
-	asks             *OrderBook      //卖盘
-	bids             *OrderBook      //买盘
-	bestBid          decimal.Decimal //买一价
-	bestAsk          decimal.Decimal //卖一价
-	baseCoinMinUnit  decimal.Decimal
-	quoteCoinMinUnit decimal.Decimal
-	c                *config.Config
-	producer         pulsar.Producer
-	proxyClient      ws.ProxyClient
-	//tick             chan *MatchResult
-	currentSeqId int64
+	asks               *OrderBook      //卖盘
+	bids               *OrderBook      //买盘
+	bestBid            decimal.Decimal //买一价
+	bestAsk            decimal.Decimal //卖一价
+	symbolConf         models.Symbol
+	producer           pulsar.Producer
+	proxyClient        ws.ProxyClient
+	currentSeqId       int64
+	quoteCoinPrecision int32
+	baseCoinPrecision  int32
 }
 
 // MatchedRecord  一次撮合匹配的结果,一次撮合会多次匹配
@@ -79,14 +78,16 @@ type AcceptedResp struct {
 	Uid int64
 }
 
-func NewMatchEngine(c *config.Config, producer pulsar.Producer) *MatchEngine {
+func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer) *MatchEngine {
 	me := &MatchEngine{
-		asks:     NewOrderBook(enum.Side_Sell),
-		bids:     NewOrderBook(enum.Side_Buy),
-		bestBid:  utils.DecimalZeroMaxPrec,
-		bestAsk:  utils.DecimalZeroMaxPrec,
-		c:        c,
-		producer: producer,
+		asks:               NewOrderBook(enum.Side_Sell),
+		bids:               NewOrderBook(enum.Side_Buy),
+		bestBid:            utils.DecimalZeroMaxPrec,
+		bestAsk:            utils.DecimalZeroMaxPrec,
+		symbolConf:         c,
+		producer:           producer,
+		quoteCoinPrecision: conf.Coin[c.QuoteCoinId-1].Precision,
+		baseCoinPrecision:  conf.Coin[c.BaseCoinId-1].Precision,
 	}
 	return me
 }
@@ -140,7 +141,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 	if m.bids.orderBook.Size() == 0 {
 		matchedResult.CancelResp = &CancelResp{
 			CancelId: takerOrder.SequenceId,
-			CoinId:   m.c.SymbolInfo.BaseCoinID,
+			CoinId:   m.symbolConf.BaseCoinId,
 			Amount:   takerOrder.UnfilledBaseAmount.String(),
 			Uid:      takerOrder.Uid,
 		}
@@ -154,8 +155,8 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 	for iterator.Next() {
 		makerOrder := iterator.Value().(*Order)
 		result := takerOrder.UnfilledBaseAmount.Cmp(makerOrder.UnfilledBaseAmount)
-		switch {
-		case result == 1:
+		switch result {
+		case defines.Gt:
 			takerOrder.OrderStatus = enum.OrderStatus_PartFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			//更新订单的剩余数量
@@ -177,7 +178,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case result == 0:
+		case defines.Eq:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 
@@ -201,7 +202,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case result == -1:
+		case defines.Lt:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_PartFilled
 
@@ -242,8 +243,6 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 		}
 		m.updateBestBid()
 	}
-	//更新深度数据
-
 	matchedResult.MatchTime = time.Now().UnixNano()
 	matchedResult.MatchID = cast.ToString(idgen.NextId())
 	m.SendMatchResult(matchedResult)
@@ -252,7 +251,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 		r := &MatchResult{
 			CancelResp: &CancelResp{
 				CancelId: takerOrder.SequenceId,
-				CoinId:   m.c.SymbolInfo.BaseCoinID,
+				CoinId:   m.symbolConf.BaseCoinId,
 				Amount:   takerOrder.UnfilledBaseAmount.String(),
 				Uid:      takerOrder.Uid,
 			},
@@ -274,11 +273,10 @@ func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *Order) {
 	if m.asks.orderBook.Size() == 0 {
 		matchedResult.CancelResp = &CancelResp{
 			CancelId: takerOrder.SequenceId,
-			CoinId:   m.c.SymbolInfo.QuoteCoinID,
+			CoinId:   m.symbolConf.QuoteCoinId,
 			Amount:   takerOrder.UnfilledQuoteAmount.String(),
 			Uid:      takerOrder.Uid,
 		}
-		//m.Next <- matchedResult
 		m.SendMatchResult(matchedResult)
 		return
 	}
@@ -292,7 +290,7 @@ LOOP:
 		makerOrder := iterator.Value().(*Order)
 		result := takerOrder.UnfilledQuoteAmount.Cmp(makerOrder.UnfilledQuoteAmount)
 		switch result {
-		case 1:
+		case defines.Gt:
 			takerOrder.OrderStatus = enum.OrderStatus_PartFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			//更新订单的剩余数量
@@ -313,7 +311,7 @@ LOOP:
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case 0:
+		case defines.Eq:
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			//更新订单的剩余数量
@@ -334,11 +332,11 @@ LOOP:
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
 
-		case -1:
+		case defines.Lt:
 			//taker金额比maker的金额要小，匹配结束
 			//按照taker的金额购买的话能买多少，小于最小的单位则结束。
 			qty := takerOrder.UnfilledQuoteAmount.Div(makerOrder.Price)
-			baseCoinMinUnit := utils.NewFromStringMaxPrec(cast.ToString(math.Pow10(int(-m.c.SymbolInfo.BaseCoinPrec.Load()))))
+			baseCoinMinUnit := decimal.New(1, -m.baseCoinPrecision)
 			if qty.LessThan(baseCoinMinUnit) {
 				break LOOP
 			}
@@ -391,7 +389,7 @@ LOOP:
 		r := &MatchResult{
 			CancelResp: &CancelResp{
 				CancelId: takerOrder.SequenceId,
-				CoinId:   m.c.SymbolInfo.QuoteCoinID,
+				CoinId:   m.symbolConf.QuoteCoinId,
 				Amount:   takerOrder.UnfilledQuoteAmount.String(),
 				Uid:      takerOrder.Uid,
 			},
@@ -422,9 +420,9 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 		//计较价格
 		result := takerOrder.UnfilledBaseAmount.Cmp(makerOrder.UnfilledBaseAmount)
 		var matchedRecord *MatchedRecord
-		switch {
+		switch result {
 		//吃完maker
-		case result == 1:
+		case defines.Gt:
 			takerOrder.OrderStatus = enum.OrderStatus_PartFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			//更新订单的剩余数量
@@ -449,7 +447,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
 
-		case result == 0:
+		case defines.Eq:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 
@@ -470,7 +468,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case result == -1:
+		case defines.Lt:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_PartFilled
 			//更新订单的剩余数量
@@ -537,8 +535,8 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 		}
 
 		result := takerOrder.UnfilledBaseAmount.Cmp(makerOrder.UnfilledBaseAmount)
-		switch {
-		case result == 1:
+		switch result {
+		case defines.Gt:
 			takerOrder.OrderStatus = enum.OrderStatus_PartFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			//更新订单的剩余数量
@@ -563,7 +561,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case result == 0:
+		case defines.Eq:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 
@@ -585,7 +583,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 			}
 			//将key加入的集合中
 			deletedKeys = append(deletedKeys, iterator.Key().(*Key))
-		case result == -1:
+		case defines.Lt:
 			takerOrder.OrderStatus = enum.OrderStatus_ALLFilled
 			makerOrder.OrderStatus = enum.OrderStatus_PartFilled
 
@@ -671,9 +669,9 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 
 		//发送取消订单消息
 
-		coinId, qty := m.c.SymbolInfo.BaseCoinID, order.UnfilledBaseAmount.String()
+		coinId, qty := m.symbolConf.BaseCoinId, order.UnfilledBaseAmount.String()
 		if orderDetail.Side == enum.Side_Buy {
-			coinId = m.c.SymbolInfo.QuoteCoinID
+			coinId = m.symbolConf.QuoteCoinId
 			qty = order.UnfilledQuoteAmount.String()
 		}
 		m.SendMatchResult(&MatchResult{
@@ -788,10 +786,10 @@ func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
 			records = append(records, r)
 		}
 		result := &matchMq.MatchResult{
-			SymbolId:      m.c.SymbolInfo.SymbolID,
-			SymbolName:    m.c.SymbolInfo.SymbolName,
-			BaseCoinId:    m.c.SymbolInfo.BaseCoinID,
-			QuoteCoinId:   m.c.SymbolInfo.QuoteCoinID,
+			SymbolId:      m.symbolConf.Id,
+			SymbolName:    m.symbolConf.Name,
+			BaseCoinId:    m.symbolConf.BaseCoinId,
+			QuoteCoinId:   m.symbolConf.QuoteCoinId,
 			MatchId:       matchResult.MatchID,
 			MatchedRecord: records,
 			BeginPrice:    beginPrice,
@@ -825,31 +823,4 @@ func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
 		logx.Severef("send message failed err=%v", err)
 	}
 
-	//m.tick <- matchResult
 }
-
-//// 这是一个偷懒的写法，我觉得放到matchmq会比较好。
-//func (m *MatchEngine) sendTick() {
-//	for matchResult := range m.tick {
-//		for _, v := range matchResult.MatchedRecords {
-//			tick := commonWs.Tick{
-//				Price:        v.Price.StringFixedBank(m.c.SymbolInfo.QuoteCoinPrec.Load()),
-//				BaseAmount:          v.BaseAmount.StringFixedBank(m.c.SymbolInfo.BaseCoinPrec.Load()),
-//				Amount:       v.Amount.StringFixedBank(m.c.SymbolInfo.QuoteCoinPrec.Load()),
-//				TimeStamp:    matchResult.MatchTime / 1e9,
-//				TakerIsBuyer: matchResult.TakerIsBuy,
-//			}
-//			msg := commonWs.Message[commonWs.Tick]{
-//				Topic:   commonWs.TickPrefix.WithParam(m.c.SymbolInfo.SymbolName),
-//				Payload: tick,
-//			}
-//			if _, err := m.proxyClient.PushData(context.Background(), &ws.Data{
-//				Uid:   "",
-//				Topic: commonWs.TickPrefix.WithParam(m.c.SymbolInfo.SymbolName),
-//				Data:  msg.ToBytes(),
-//			}); err != nil {
-//				logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", tick))
-//			}
-//		}
-//	}
-//}

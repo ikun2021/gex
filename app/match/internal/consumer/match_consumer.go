@@ -27,6 +27,8 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init match consumer error:%v", err)
 			}
+			engine.NewMatchEngine()
+
 			for {
 				message, err := consumer.Receive(ctx)
 				if err != nil {
