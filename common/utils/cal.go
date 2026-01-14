@@ -1,6 +1,9 @@
 package utils
 
-import "github.com/shopspring/decimal"
+import (
+	"errors"
+	"github.com/shopspring/decimal"
+)
 
 // CurrencyConfig 定义币种精度
 type CurrencyConfig struct {

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/config"
 	"github.com/ikun2021/gex/common/defines"
@@ -49,13 +50,42 @@ type MatchResult struct {
 	//每一次匹配的结构
 	MatchedRecords []*MatchedRecord
 	//本次撮合的id
-	MatchID    string
-	CancelResp *CancelResult
+	MatchID string
 	//撮合时间
 	MatchTime int64
 	//taker为买单
 	TakerIsBuy bool
 }
+
+func (m *MatchResult) dump() {
+	fmt.Println("========================================")
+	fmt.Printf("📊 撮合结果详情 (Match Result):\n")
+	fmt.Println("----------------------------------------")
+	fmt.Printf("🆔 撮合ID: %s\n", m.MatchID)
+	fmt.Printf("⏰ 撮合时间: %s\n", time.Unix(0, m.MatchTime).Format("2006-01-02 15:04:05.000"))
+	fmt.Printf("📈 Taker方向: %s\n", func() string {
+		if m.TakerIsBuy {
+			return "买入 (BUY)"
+		}
+		return "卖出 (SELL)"
+	}())
+	fmt.Printf("🔢 匹配记录数量: %d\n", len(m.MatchedRecords))
+
+	if len(m.MatchedRecords) > 0 {
+		fmt.Println("----------------------------------------")
+		fmt.Println("📋 匹配记录详情:")
+		for i, record := range m.MatchedRecords {
+			fmt.Printf("  记录 #%d:\n", i+1)
+			fmt.Printf("    📍 价格: %s\n", record.Price.String())
+			fmt.Printf("    📦 数量: %s\n", record.Qty.String())
+			fmt.Printf("    💰 金额: %s\n", record.Amount.String())
+			fmt.Printf("    🔑 匹配ID: %s\n", record.MatchedRecordID)
+		}
+		fmt.Println("----------------------------------------")
+	}
+	fmt.Println("========================================")
+}
+
 type AcceptedResult struct {
 	//订单id
 	OrderId string
@@ -71,12 +101,67 @@ type AcceptedResult struct {
 	baseAmount string
 }
 
+func (a *AcceptedResult) dump() {
+	fmt.Println("========================================")
+	fmt.Printf("✅ 订单接受详情 (Accepted Result):\n")
+	fmt.Println("----------------------------------------")
+	fmt.Printf("🆔 订单ID: %s\n", a.OrderId)
+	fmt.Printf("👤 用户ID: %d\n", a.Uid)
+	fmt.Printf("📈 方向: %s\n", func() string {
+		switch a.side {
+		case enum.Side_Buy:
+			return "买入 (BUY)"
+		case enum.Side_Sell:
+			return "卖出 (SELL)"
+		default:
+			return "未知 (UNKNOWN)"
+		}
+	}())
+	fmt.Printf("📍 价格: %s\n", a.price)
+	fmt.Printf("💰 计价币金额: %s\n", a.quoteAmount)
+	fmt.Printf("📦 基础币数量: %s\n", a.baseAmount)
+	fmt.Println("========================================")
+}
+
 type MatchOutputMessage struct {
 	MatchResult    *MatchResult
 	CancelResult   *CancelResult
 	AcceptedResult *AcceptedResult
 	MsgType        MsgType
 }
+
+func (m *MatchOutputMessage) Dump() {
+	fmt.Println("========================================")
+	fmt.Printf("📤 消息输出详情 (Match Output Message):\n")
+	fmt.Println("----------------------------------------")
+	fmt.Printf("🏷️  消息类型: %s (%s)\n", m.MsgType, m.MsgType.String())
+	fmt.Println("----------------------------------------")
+
+	switch m.MsgType {
+	case MsgTypeMatchResult:
+		if m.MatchResult != nil {
+			m.MatchResult.dump()
+		} else {
+			fmt.Println("⚠️  撮合结果为空")
+		}
+	case MsgTypeCancelResult:
+		if m.CancelResult != nil {
+			m.CancelResult.dump()
+		} else {
+			fmt.Println("⚠️  取消结果为空")
+		}
+	case MsgTypeAcceptedResult:
+		if m.AcceptedResult != nil {
+			m.AcceptedResult.dump()
+		} else {
+			fmt.Println("⚠️  接受结果为空")
+		}
+	default:
+		fmt.Printf("❓ 未知消息类型: %d\n", m.MsgType)
+	}
+	fmt.Println("========================================")
+}
+
 type MsgType int8
 
 const (
@@ -84,6 +169,17 @@ const (
 	MsgTypeCancelResult
 	MsgTypeAcceptedResult
 )
+
+func (msgType MsgType) String() string {
+	switch msgType {
+	case MsgTypeMatchResult:
+		return "撮合结果"
+	case MsgTypeCancelResult:
+		return "订单取消结果"
+	default:
+		return "订单接受"
+	}
+}
 
 type CancelResult struct {
 	//取消订单的id，如果不为空则表示取消订单。
@@ -95,6 +191,18 @@ type CancelResult struct {
 	//用户id
 	Uid int64
 	Ts  int64
+}
+
+func (c *CancelResult) dump() {
+	fmt.Println("========================================")
+	fmt.Printf("🚫 订单取消详情 (Cancel Result):\n")
+	fmt.Println("----------------------------------------")
+	fmt.Printf("🆔 取消订单ID: %d\n", c.CancelId)
+	fmt.Printf("🪙 币种ID: %d\n", c.CoinId)
+	fmt.Printf("💰 取消数量: %s\n", c.Amount)
+	fmt.Printf("👤 用户ID: %d\n", c.Uid)
+	fmt.Printf("⏰ 取消时间: %s\n", time.Unix(0, c.Ts).Format("2006-01-02 15:04:05.000"))
+	fmt.Println("========================================")
 }
 
 type AcceptedResp struct {
@@ -283,13 +391,11 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
 		r := &MatchOutputMessage{
-			MatchResult: &MatchResult{
-				CancelResp: &CancelResult{
-					CancelId: takerOrder.SequenceId,
-					CoinId:   m.symbolConf.BaseCoinId,
-					Amount:   takerOrder.UnfilledBaseAmount.String(),
-					Uid:      takerOrder.Uid,
-				},
+			CancelResult: &CancelResult{
+				CancelId: takerOrder.SequenceId,
+				CoinId:   m.symbolConf.BaseCoinId,
+				Amount:   takerOrder.UnfilledBaseAmount.String(),
+				Uid:      takerOrder.Uid,
 			},
 			MsgType: MsgTypeCancelResult,
 		}
@@ -427,13 +533,11 @@ LOOP:
 	}
 
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
-		r := &MatchOutputMessage{MatchResult: &MatchResult{
-			CancelResp: &CancelResult{
-				CancelId: takerOrder.SequenceId,
-				CoinId:   m.symbolConf.QuoteCoinId,
-				Amount:   takerOrder.UnfilledQuoteAmount.String(),
-				Uid:      takerOrder.Uid,
-			},
+		r := &MatchOutputMessage{CancelResult: &CancelResult{
+			CancelId: takerOrder.SequenceId,
+			CoinId:   m.symbolConf.QuoteCoinId,
+			Amount:   takerOrder.UnfilledQuoteAmount.String(),
+			Uid:      takerOrder.Uid,
 		}}
 		//发送取消订单
 		m.SendResult(r)

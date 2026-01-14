@@ -28,10 +28,6 @@ func NewFromStringMaxPrec(s string) decimal.Decimal {
 	return NewFromString(s, MaxPrec)
 }
 
-func New() {
-	decimal.New()
-}
-
 func NewFromString(s string, prec int32) decimal.Decimal {
 	var index = strings.IndexByte(s, '.')
 	// 小数部分所有数字
