@@ -23,6 +23,8 @@ enum OrderType{
   //立即全部成交否則取消
   FOK=3;
 }
+
+
 //订单状态
 enum OrderStatus{
   //未知

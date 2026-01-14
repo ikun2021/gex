@@ -50,13 +50,42 @@ type MatchResult struct {
 	MatchedRecords []*MatchedRecord
 	//本次撮合的id
 	MatchID    string
-	CancelResp *CancelResp
+	CancelResp *CancelResult
 	//撮合时间
 	MatchTime int64
 	//taker为买单
 	TakerIsBuy bool
 }
-type CancelResp struct {
+type AcceptedResult struct {
+	//订单id
+	OrderId string
+	//用户id
+	Uid int64
+	//方向
+	side enum.Side
+	//价格
+	price string
+	//计价币
+	quoteAmount string
+	//基础币数量
+	baseAmount string
+}
+
+type MatchOutputMessage struct {
+	MatchResult    *MatchResult
+	CancelResult   *CancelResult
+	AcceptedResult *AcceptedResult
+	MsgType        MsgType
+}
+type MsgType int8
+
+const (
+	MsgTypeMatchResult MsgType = iota + 1
+	MsgTypeCancelResult
+	MsgTypeAcceptedResult
+)
+
+type CancelResult struct {
 	//取消订单的id，如果不为空则表示取消订单。
 	CancelId int64
 	//币种id 取消买单则为计价币id，取消卖单则为基础币id
@@ -65,6 +94,7 @@ type CancelResp struct {
 	Amount string
 	//用户id
 	Uid int64
+	Ts  int64
 }
 
 type AcceptedResp struct {
@@ -133,19 +163,23 @@ func (m *MatchEngine) updateBestAsk() {
 // 匹配市价单卖单
 func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 
-	matchedResult := &MatchResult{
-		MatchedRecords: make([]*MatchedRecord, 0, 2),
-		TakerIsBuy:     false,
+	matchMsg := &MatchOutputMessage{
+		MatchResult: &MatchResult{
+			MatchedRecords: make([]*MatchedRecord, 0, 2),
+			TakerIsBuy:     false,
+		},
+		MsgType: MsgTypeMatchResult,
 	}
 	//如果没有买盘，直接取消订单
 	if m.bids.orderBook.Size() == 0 {
-		matchedResult.CancelResp = &CancelResp{
+		matchMsg.CancelResult = &CancelResult{
 			CancelId: takerOrder.SequenceId,
 			CoinId:   m.symbolConf.BaseCoinId,
 			Amount:   takerOrder.UnfilledBaseAmount.String(),
 			Uid:      takerOrder.Uid,
 		}
-		m.SendMatchResult(matchedResult)
+		matchMsg.MsgType = MsgTypeCancelResult
+		m.SendResult(matchMsg)
 		return
 	}
 
@@ -229,7 +263,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 		matchedRecord.Taker = *takerOrder
 		matchedRecord.Maker = *makerOrder
 		matchedRecord.MatchedRecordID = cast.ToString(idgen.NextId())
-		matchedResult.MatchedRecords = append(matchedResult.MatchedRecords, matchedRecord)
+		matchMsg.MatchResult.MatchedRecords = append(matchMsg.MatchResult.MatchedRecords, matchedRecord)
 		//订单全部成交退出，或者小于下一个订单的价格。不再循环匹配。
 		if takerOrder.OrderStatus == enum.OrderStatus_ALLFilled {
 			break
@@ -243,21 +277,24 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 		}
 		m.updateBestBid()
 	}
-	matchedResult.MatchTime = time.Now().UnixNano()
-	matchedResult.MatchID = cast.ToString(idgen.NextId())
-	m.SendMatchResult(matchedResult)
+	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
+	matchMsg.MatchResult.MatchID = cast.ToString(idgen.NextId())
+	m.SendResult(matchMsg)
 
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
-		r := &MatchResult{
-			CancelResp: &CancelResp{
-				CancelId: takerOrder.SequenceId,
-				CoinId:   m.symbolConf.BaseCoinId,
-				Amount:   takerOrder.UnfilledBaseAmount.String(),
-				Uid:      takerOrder.Uid,
+		r := &MatchOutputMessage{
+			MatchResult: &MatchResult{
+				CancelResp: &CancelResult{
+					CancelId: takerOrder.SequenceId,
+					CoinId:   m.symbolConf.BaseCoinId,
+					Amount:   takerOrder.UnfilledBaseAmount.String(),
+					Uid:      takerOrder.Uid,
+				},
 			},
+			MsgType: MsgTypeCancelResult,
 		}
 		//发送取消订单
-		m.SendMatchResult(r)
+		m.SendResult(r)
 
 	}
 }
@@ -265,19 +302,23 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 // 市价买单 按照指定计价币的数量来买
 func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *Order) {
 
-	matchedResult := &MatchResult{
-		MatchedRecords: make([]*MatchedRecord, 0, 2),
-		TakerIsBuy:     true,
+	matchMsg := &MatchOutputMessage{
+		MatchResult: &MatchResult{
+			MatchedRecords: make([]*MatchedRecord, 0, 2),
+			TakerIsBuy:     true,
+		},
+		MsgType: MsgTypeMatchResult,
 	}
 	//如果没有卖盘，直接取消订单
 	if m.asks.orderBook.Size() == 0 {
-		matchedResult.CancelResp = &CancelResp{
+		matchMsg.CancelResult = &CancelResult{
 			CancelId: takerOrder.SequenceId,
 			CoinId:   m.symbolConf.QuoteCoinId,
 			Amount:   takerOrder.UnfilledQuoteAmount.String(),
 			Uid:      takerOrder.Uid,
 		}
-		m.SendMatchResult(matchedResult)
+		matchMsg.MsgType = MsgTypeCancelResult
+		m.SendResult(matchMsg)
 		return
 	}
 
@@ -367,9 +408,9 @@ LOOP:
 		matchedRecord.Taker = *takerOrder
 		matchedRecord.Maker = *makerOrder
 		matchedRecord.MatchedRecordID = cast.ToString(idgen.NextId())
-		matchedResult.MatchedRecords = append(matchedResult.MatchedRecords, matchedRecord)
+		matchMsg.MatchResult.MatchedRecords = append(matchMsg.MatchResult.MatchedRecords, matchedRecord)
 	}
-	matchedResult.MatchID = cast.ToString(idgen.NextId())
+	matchMsg.MatchResult.MatchID = cast.ToString(idgen.NextId())
 	//删除买盘中的被匹配完的订单，同时更新卖一价
 	if len(deletedKeys) > 0 {
 		for _, v := range deletedKeys {
@@ -379,32 +420,35 @@ LOOP:
 	}
 	//更新深度数据
 
-	matchedResult.MatchTime = time.Now().UnixNano()
-	//m.Next <- matchedResult
-	if len(matchedResult.MatchedRecords) > 0 {
-		m.SendMatchResult(matchedResult)
+	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
+	//m.Next <- matchMsg
+	if len(matchMsg.MatchResult.MatchedRecords) > 0 {
+		m.SendResult(matchMsg)
 	}
 
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
-		r := &MatchResult{
-			CancelResp: &CancelResp{
+		r := &MatchOutputMessage{MatchResult: &MatchResult{
+			CancelResp: &CancelResult{
 				CancelId: takerOrder.SequenceId,
 				CoinId:   m.symbolConf.QuoteCoinId,
 				Amount:   takerOrder.UnfilledQuoteAmount.String(),
 				Uid:      takerOrder.Uid,
 			},
-		}
+		}}
 		//发送取消订单
-		m.SendMatchResult(r)
+		m.SendResult(r)
 
 	}
 }
 
 // 匹配限价买单
 func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
-	matchedResult := &MatchResult{
-		MatchedRecords: make([]*MatchedRecord, 0, 2),
-		TakerIsBuy:     true,
+	matchMsg := &MatchOutputMessage{
+		MatchResult: &MatchResult{
+			MatchedRecords: make([]*MatchedRecord, 0, 2),
+			TakerIsBuy:     true,
+		},
+		MsgType: MsgTypeMatchResult,
 	}
 	//买单从卖盘中找
 	iterator := m.asks.orderBook.Iterator()
@@ -494,7 +538,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 		matchedRecord.Taker = *takerOrder
 		matchedRecord.Maker = *makerOrder
 		matchedRecord.MatchedRecordID = cast.ToString(idgen.NextId())
-		matchedResult.MatchedRecords = append(matchedResult.MatchedRecords, matchedRecord)
+		matchMsg.MatchResult.MatchedRecords = append(matchMsg.MatchResult.MatchedRecords, matchedRecord)
 
 	}
 	//删除卖盘被匹配过的订单，更新卖一价
@@ -510,18 +554,21 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 	}
 	//更新深度数据
 
-	matchedResult.MatchTime = time.Now().UnixNano()
-	matchedResult.MatchID = cast.ToString(idgen.NextId())
+	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
+	matchMsg.MatchResult.MatchID = cast.ToString(idgen.NextId())
 	//发送撮合结果
-	m.SendMatchResult(matchedResult)
+	m.SendResult(matchMsg)
 
 }
 
 // 匹配限价卖单
 func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
-	matchedResult := &MatchResult{
-		MatchedRecords: make([]*MatchedRecord, 0, 2),
-		TakerIsBuy:     false,
+	matchMessage := &MatchOutputMessage{
+		MatchResult: &MatchResult{
+			MatchedRecords: make([]*MatchedRecord, 0, 2),
+			TakerIsBuy:     false,
+		},
+		MsgType: MsgTypeMatchResult,
 	}
 	//遍历买盘
 	iterator := m.bids.orderBook.Iterator()
@@ -608,7 +655,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 		matchedRecord.Taker = *takerOrder
 		matchedRecord.Maker = *makerOrder
 		matchedRecord.MatchedRecordID = cast.ToString(idgen.NextId())
-		matchedResult.MatchedRecords = append(matchedResult.MatchedRecords, matchedRecord)
+		matchMessage.MatchResult.MatchedRecords = append(matchMessage.MatchResult.MatchedRecords, matchedRecord)
 
 	}
 	//删除买盘被匹配过的订单，更新卖一价
@@ -627,9 +674,9 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 	}
 	//更新深度数据
 
-	matchedResult.MatchTime = time.Now().UnixNano()
-	matchedResult.MatchID = cast.ToString(idgen.NextId())
-	m.SendMatchResult(matchedResult)
+	matchMessage.MatchResult.MatchTime = time.Now().UnixNano()
+	matchMessage.MatchResult.MatchID = cast.ToString(idgen.NextId())
+	m.SendResult(matchMessage)
 
 }
 func (m *MatchEngine) HandleOrder(order *Order) {
@@ -674,14 +721,14 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 			coinId = m.symbolConf.QuoteCoinId
 			qty = order.UnfilledQuoteAmount.String()
 		}
-		m.SendMatchResult(&MatchResult{
-			CancelResp: &CancelResp{
+		m.SendResult(&MatchOutputMessage{
+			CancelResult: &CancelResult{
 				CancelId: order.SequenceId,
 				CoinId:   coinId,
 				Amount:   qty,
 				Uid:      orderDetail.Uid,
 			},
-			MatchTime: time.Now().UnixNano(),
+			MsgType: MsgTypeCancelResult,
 		})
 	} else {
 		logx.Debugf("order = %+v bestBid = %v bestAsk=%v", order, m.bestBid, m.bestAsk)
@@ -689,21 +736,48 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		//买单市价单
 		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_MO:
 			m.matchMarkerOrderBuy(order)
-		//买单限价单
+		//买单限价单,发送一条accepted消息
 		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_LO:
+			m.SendResult(&MatchOutputMessage{
+				MatchResult:  nil,
+				CancelResult: nil,
+				AcceptedResult: &AcceptedResult{
+					OrderId:     order.OrderID,
+					Uid:         order.Uid,
+					side:        order.Side,
+					price:       order.Price.String(),
+					quoteAmount: order.QuoteAmount.String(),
+					baseAmount:  order.BaseAmount.String(),
+				},
+				MsgType: MsgTypeAcceptedResult,
+			})
+
 			//价格大于卖一价，同时卖一价不为零
 			if order.Price.GreaterThanOrEqual(m.bestAsk) && m.bestAsk.GreaterThan(utils.DecimalZeroMaxPrec) {
 				m.matchLimitOrderBuy(order)
 			} else {
 				m.addOrder(order)
 				//更新盘口深度
-
 			}
 		//卖单市价单
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_MO:
 			m.matchMarketOrderSell(order)
-		//卖单限价单
+		//买单限价单,发送一条accepted消息
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_LO:
+			m.SendResult(&MatchOutputMessage{
+				MatchResult:  nil,
+				CancelResult: nil,
+				AcceptedResult: &AcceptedResult{
+					OrderId:     order.OrderID,
+					Uid:         order.Uid,
+					side:        order.Side,
+					price:       order.Price.String(),
+					quoteAmount: order.QuoteAmount.String(),
+					baseAmount:  order.BaseAmount.String(),
+				},
+				MsgType: MsgTypeAcceptedResult,
+			})
+
 			if order.Price.LessThanOrEqual(m.bestBid) && m.bestBid.GreaterThan(utils.DecimalZeroMaxPrec) {
 				m.matchLimitOrderSell(order)
 			} else {
@@ -717,21 +791,14 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 
 }
 
-// SendMatchResult 发送撮合结果，这个操作不异步。
-func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
+// SendResult 发送撮合结果，这个操作不异步。
+func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 
-	var resp matchMq.MatchResp
+	var resp matchMq.MatchOutput
 	resp.MessageId = stringx.Rand()
-	if matchResult.CancelResp != nil {
-		resp.Resp = &matchMq.MatchResp_Cancel{
-			Cancel: &matchMq.CancelResp{
-				Id:     matchResult.CancelResp.CancelId,
-				CoinId: matchResult.CancelResp.CoinId,
-				Amount: matchResult.CancelResp.Amount,
-				Uid:    matchResult.CancelResp.Uid,
-			},
-		}
-	} else {
+	switch matchMsg.MsgType {
+	case MsgTypeMatchResult:
+		matchResult := matchMsg.MatchResult
 		beginPrice, endPrice := matchResult.MatchedRecords[0].Price.String(), matchResult.MatchedRecords[len(matchResult.MatchedRecords)-1].Price.String()
 		lowPrice, highPrice := beginPrice, endPrice
 		if !matchResult.TakerIsBuy {
@@ -801,9 +868,20 @@ func (m *MatchEngine) SendMatchResult(matchResult *MatchResult) {
 			LowPrice:      lowPrice,
 			TakerIsBuy:    matchResult.TakerIsBuy,
 		}
-		resp.Resp = &matchMq.MatchResp_MatchResult{
+		resp.Result = &matchMq.MatchOutput_MatchResult{
 			MatchResult: result,
 		}
+	case MsgTypeCancelResult:
+		resp.Result = &matchMq.MatchOutput_CancelResult{
+			CancelResult: &matchMq.CancelResult{
+				Id:     matchMsg.CancelResult.CancelId,
+				CoinId: matchMsg.CancelResult.CoinId,
+				Amount: matchMsg.CancelResult.Amount,
+				Uid:    matchMsg.CancelResult.Uid,
+			},
+		}
+	case MsgTypeAcceptedResult:
+
 	}
 
 	logx.Debugw("send match result", logx.Field("data", &resp))

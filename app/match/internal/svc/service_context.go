@@ -16,6 +16,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		logx.Severef("init pulsar client failed %v", err)
 	}
+
 	return &ServiceContext{
 		Config:       c,
 		PulsarClient: client,

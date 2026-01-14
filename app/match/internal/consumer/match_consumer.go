@@ -27,7 +27,13 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init match consumer error:%v", err)
 			}
-			engine.NewMatchEngine()
+			producer, err := sc.PulsarClient.CreateProducer(pulsar.ProducerOptions{
+				Topic: defines.MatchTopicPrefix + symbol.Name,
+			})
+			if err != nil {
+				logx.Severef("init pulsar producer failed %v", err)
+			}
+			me := engine.NewMatchEngine(symbol, sc.Config, producer)
 
 			for {
 				message, err := consumer.Receive(ctx)
@@ -35,47 +41,46 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 					logx.Errorw("receive message fail", logger.ErrorField(err))
 					continue
 				}
-				var matchReq matchMq.MatchReq
+				var matchReq matchMq.MatchInput
 				if err := proto.Unmarshal(message.Payload(), &matchReq); err != nil {
 					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
 					continue
 				}
 				logx.Infow("receive message failed", logx.Field("data", &matchReq))
-				switch operate := matchReq.Operate.(type) {
-				case *matchMq.MatchReq_NewOrder:
-
+				switch event := matchReq.Event.(type) {
+				case *matchMq.MatchInput_CreateOrder:
 					order := &engine.Order{
-						Uid:                 operate.NewOrder.Uid,
-						OrderID:             operate.NewOrder.OrderId,
-						SequenceId:          operate.NewOrder.SequenceId,
+						Uid:                 event.CreateOrder.Uid,
+						OrderID:             event.CreateOrder.OrderId,
+						SequenceId:          event.CreateOrder.SequenceId,
 						CreateTime:          0,
 						IsCancel:            false,
-						Price:               utils.NewFromStringMaxPrec(operate.NewOrder.Price),
-						BaseAmount:          utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
-						OrderType:           operate.NewOrder.OrderType,
-						QuoteAmount:         utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
-						Side:                operate.NewOrder.Side,
+						Price:               utils.NewFromStringMaxPrec(event.CreateOrder.Price),
+						BaseAmount:          utils.NewFromStringMaxPrec(event.CreateOrder.BaseAmount),
+						OrderType:           event.CreateOrder.OrderType,
+						QuoteAmount:         utils.NewFromStringMaxPrec(event.CreateOrder.QuoteAmount),
+						Side:                event.CreateOrder.Side,
 						OrderStatus:         enum.OrderStatus_NewCreated,
-						UnfilledBaseAmount:  utils.NewFromStringMaxPrec(operate.NewOrder.BaseAmount),
+						UnfilledBaseAmount:  utils.NewFromStringMaxPrec(event.CreateOrder.BaseAmount),
 						FilledBaseAmount:    utils.DecimalZeroMaxPrec,
-						UnfilledQuoteAmount: utils.NewFromStringMaxPrec(operate.NewOrder.QuoteAmount),
+						UnfilledQuoteAmount: utils.NewFromStringMaxPrec(event.CreateOrder.QuoteAmount),
 						FilledQuoteAmount:   utils.DecimalZeroMaxPrec,
 					}
-					sc.MatchEngine.HandleOrder(order)
-				case *matchMq.MatchReq_Cancel:
+					me.HandleOrder(order)
+				case *matchMq.MatchInput_CancelOrder:
 					order := &engine.Order{
 						OrderID:    "",
-						SequenceId: operate.Cancel.Id,
+						SequenceId: event.CancelOrder.Id,
 						CreateTime: 0,
 						IsCancel:   true,
-						Side:       operate.Cancel.Side,
+						Side:       event.CancelOrder.Side,
 						Uid:        0,
-						OrderType:  operate.Cancel.OrderType,
-						Price:      utils.NewFromStringMaxPrec(operate.Cancel.Price),
+						OrderType:  event.CancelOrder.OrderType,
+						Price:      utils.NewFromStringMaxPrec(event.CancelOrder.Price),
 					}
-					sc.MatchEngine.HandleOrder(order)
+					me.HandleOrder(order)
 				}
-				if err := sc.MatchConsumer.Ack(message); err != nil {
+				if err := consumer.Ack(message); err != nil {
 					logx.Errorw("consumer message failed", logger.ErrorField(err))
 				}
 			}

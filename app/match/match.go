@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/ikun2021/gex/app/match/internal/config"
+	"github.com/ikun2021/gex/app/match/internal/consumer"
 	"github.com/ikun2021/gex/app/match/internal/svc"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/conf"
@@ -17,11 +18,10 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 	//初始化配置
-	ctx := svc.NewServiceContext(&c)
-
-	defer s.Stop()
+	ctx := svc.NewServiceContext(c)
+	consumer.InitMatchConsumer(ctx)
 	logx.SetLevel(logx.DebugLevel)
 	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))
-	logx.Infof("Starting rpc server at %s...", c.ListenOn)
-	s.Start()
+
+	select {}
 }
