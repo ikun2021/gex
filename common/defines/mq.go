@@ -1,5 +1,6 @@
 package defines
 
 const (
-	MatchTopicPrefix = "input_match_"
+	MatchTopicInputPrefix  = "input_match_"
+	MatchTopicOutputPrefix = "output_match_"
 )

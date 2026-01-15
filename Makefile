@@ -7,7 +7,7 @@ enum:
 	protoc   -I. --go_out=./  common/proto/enum/*.proto
 matchmq:
 	#--go_out指定的路径和option go_package = "trade/common/proto/mq/match;proto"; 指定的路径一起决定文件生成的位置 这个路径trade/common/proto/mq/match也是别人导入时用到的路径。
-	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto && make matchmodel
+	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
 
 matchmodel:
 	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/match/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
@@ -15,6 +15,8 @@ matchmodel:
 gapi:
 	goctl api go -api=app/gateway/desc/gateway.api -dir=app/gateway -style=go_zero  -home=template
 
+quoterpc:
+	goctl rpc  protoc -I./ app/quote/rpc/pb/quote.proto --go_out=app/quote/rpc --go-grpc_out=app/quote/rpc  --zrpc_out=app/quote/rpc -style=go_zero  -home=template
 
 adminapi:
 	goctl api go -api=app/admin/api/desc/admin.api -dir=app/admin/api -style=go_zero  -home=template &&   make admindoc
@@ -26,6 +28,9 @@ adminmodel:
 	gentool --dsn="root:root@tcp(192.168.2.159:3307)/admin?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/admin/api/internal/dao/admin/query -fieldMap="decimal:string;tinyint:int32;int:int32" -fieldSignable=true
 	softdeleted -p app/admin/api/internal/dao/model/*.go
 	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/admin/api/internal/dao/match/query -fieldMap="decimal:string;tinyint:int32;int:int64"
+matchmq:
+	#--go_out指定的路径和option go_package = "trade/common/proto/mq/match;proto"; 指定的路径一起决定文件生成的位置 这个路径trade/common/proto/mq/match也是别人导入时用到的路径。
+	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
 
 kline:
 	make klinerpc  && make klinemodel

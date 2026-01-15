@@ -18,6 +18,63 @@ type OrderBook struct {
 	side      enum.Side
 }
 
+func (ob *OrderBook) dump() {
+	sideStr := "买盘 (BIDS)"
+	if ob.side == enum.Side_Sell {
+		sideStr = "卖盘 (ASKS)"
+	}
+	fmt.Printf("📋 ########盘口(%s): #######\n", sideStr)
+	fmt.Printf("📊 订单总数: %d\n", ob.orderBook.Size())
+	fmt.Printf("📈 方向: %s\n", func() string {
+		switch ob.side {
+		case enum.Side_Buy:
+			return "买入 (BUY)"
+		case enum.Side_Sell:
+			return "卖出 (SELL)"
+		default:
+			return "未知 (UNKNOWN)"
+		}
+	}())
+
+	fmt.Println("📝 订单列表:")
+
+	values := ob.orderBook.Values()
+	if ob.side == enum.Side_Sell {
+		// 卖盘按价格从高到低显示
+		for i := len(values) - 1; i >= 0; i-- {
+			order := values[i].(*Order)
+			fmt.Printf("  📄 订单 #%d:\n", i+1)
+			fmt.Printf("    🆔 订单ID: %s\n", order.OrderID)
+			fmt.Printf("    📍 价格: %s\n", order.Price.String())
+			fmt.Printf("    📦 总数量: %s\n", order.BaseAmount.String())
+			fmt.Printf("    📥 已成交数量: %s\n", order.FilledBaseAmount.String())
+			fmt.Printf("    📤 未成交数量: %s\n", order.UnfilledBaseAmount.String())
+			fmt.Printf("    💰 总金额: %s\n", order.QuoteAmount.String())
+			fmt.Printf("    💳 已成交金额: %s\n", order.FilledQuoteAmount.String())
+			fmt.Printf("    💸 未成交金额: %s\n", order.UnfilledQuoteAmount.String())
+			fmt.Printf("    👤 用户ID: %d\n", order.Uid)
+			fmt.Printf("    📊 订单状态: %s\n", order.OrderStatus.String())
+		}
+	} else {
+		// 买盘按价格从高到低显示
+		for i := len(values) - 1; i >= 0; i-- {
+			order := values[i].(*Order)
+			fmt.Printf("  📄 订单 #%d:\n", i+1)
+			fmt.Printf("    🆔 订单ID: %s\n", order.OrderID)
+			fmt.Printf("    📍 价格: %s\n", order.Price.String())
+			fmt.Printf("    📦 总数量: %s\n", order.BaseAmount.String())
+			fmt.Printf("    📥 已成交数量: %s\n", order.FilledBaseAmount.String())
+			fmt.Printf("    📤 未成交数量: %s\n", order.UnfilledBaseAmount.String())
+			fmt.Printf("    💰 总金额: %s\n", order.QuoteAmount.String())
+			fmt.Printf("    💳 已成交金额: %s\n", order.FilledQuoteAmount.String())
+			fmt.Printf("    💸 未成交金额: %s\n", order.UnfilledQuoteAmount.String())
+			fmt.Printf("    👤 用户ID: %d\n", order.Uid)
+			fmt.Printf("    📊 订单状态: %s\n", order.OrderStatus.String())
+		}
+	}
+
+}
+
 type DepthPosition struct {
 	Price string `json:"Price"`
 	Qty   string `json:"qty"`

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"github.com/agiledragon/gomonkey/v2"
 	"github.com/ikun2021/gex/app/match/internal/config"
 	"github.com/ikun2021/gex/common/models"
@@ -8,6 +9,7 @@ import (
 	"github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/proto/enum"
 	"github.com/shopspring/decimal"
+	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/core/stringx"
 	"github.com/zeromicro/go-zero/zrpc"
@@ -50,7 +52,7 @@ func TestMatch(t *testing.T) {
 		matchMsg.Dump()
 	})
 	defer patches.Reset()
-
+	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
 	me.HandleOrder(&Order{
 		OrderID:             stringx.Rand(),
 		SequenceId:          1,
@@ -65,8 +67,94 @@ func TestMatch(t *testing.T) {
 		OrderStatus:         enum.OrderStatus_NewCreated,
 		UnfilledBaseAmount:  decimal.New(1, 1),
 		FilledBaseAmount:    decimal.Decimal{},
-		UnfilledQuoteAmount: decimal.Decimal{},
-		FilledQuoteAmount:   decimal.New(1, 1),
+		UnfilledQuoteAmount: decimal.New(1, 1),
+		FilledQuoteAmount:   decimal.Decimal{},
 	})
+	me.HandleOrder(&Order{
+		OrderID:             stringx.Rand(),
+		SequenceId:          1,
+		CreateTime:          time.Now().UnixNano(),
+		IsCancel:            false,
+		Uid:                 1,
+		Price:               decimal.New(1, 1), //10
+		BaseAmount:          decimal.New(1, 1),
+		OrderType:           enum.OrderType_LO,
+		QuoteAmount:         decimal.New(1, 1),
+		Side:                enum.Side_Sell,
+		OrderStatus:         enum.OrderStatus_NewCreated,
+		UnfilledBaseAmount:  decimal.New(1, 1),
+		FilledBaseAmount:    decimal.Decimal{},
+		UnfilledQuoteAmount: decimal.New(1, 1),
+		FilledQuoteAmount:   decimal.Decimal{},
+	})
+	me.dump()
+
+}
+func TestMatchCancel(t *testing.T) {
+	var me = NewMatchEngine(models.Symbol{
+		Name:        "USDT_BTC",
+		BaseCoinId:  2,
+		BaseCoin:    "BTC",
+		QuoteCoin:   "USDT",
+		QuoteCoinId: 1,
+		Id:          1,
+	}, config.Config{
+		PulsarConfig: pulsar.PulsarConfig{},
+		Symbol:       nil,
+		Coin: []models.Coin{{
+			Name:      "USDT",
+			Id:        1,
+			Precision: 6,
+		}, {
+			Name:      "BTC",
+			Id:        2,
+			Precision: 6,
+		}},
+		OrderRpcConf:     zrpc.RpcClientConf{},
+		RedisConf:        redis.RedisConf{},
+		EtcdRegisterConf: etcd.EtcdRegisterConf{},
+	}, nil)
+
+	patches := gomonkey.ApplyMethod(reflect.TypeOf(me), "SendResult", func(_ *MatchEngine, matchMsg *MatchOutputMessage) {
+		matchMsg.Dump()
+	})
+	defer patches.Reset()
+	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
+	me.HandleOrder(&Order{
+		OrderID:             stringx.Rand(),
+		SequenceId:          1,
+		CreateTime:          time.Now().UnixNano(),
+		IsCancel:            false,
+		Uid:                 1,
+		Price:               decimal.New(1, 1), //10
+		BaseAmount:          decimal.New(1, 1),
+		OrderType:           enum.OrderType_LO,
+		QuoteAmount:         decimal.New(1, 1),
+		Side:                enum.Side_Buy,
+		OrderStatus:         enum.OrderStatus_NewCreated,
+		UnfilledBaseAmount:  decimal.New(1, 1),
+		FilledBaseAmount:    decimal.Decimal{},
+		UnfilledQuoteAmount: decimal.New(1, 1),
+		FilledQuoteAmount:   decimal.Decimal{},
+	})
+	me.HandleOrder(&Order{
+		OrderID:             stringx.Rand(),
+		SequenceId:          2,
+		CreateTime:          time.Now().UnixNano(),
+		IsCancel:            false,
+		Uid:                 1,
+		Price:               decimal.New(1, 1), //10
+		BaseAmount:          decimal.New(1, 1),
+		OrderType:           enum.OrderType_LO,
+		QuoteAmount:         decimal.New(1, 1),
+		Side:                enum.Side_Buy,
+		OrderStatus:         enum.OrderStatus_NewCreated,
+		UnfilledBaseAmount:  decimal.New(1, 1),
+		FilledBaseAmount:    decimal.Decimal{},
+		UnfilledQuoteAmount: decimal.New(1, 1),
+		FilledQuoteAmount:   decimal.Decimal{},
+	})
+	fmt.Printf("处理订单后:\n")
+	me.dump()
 
 }

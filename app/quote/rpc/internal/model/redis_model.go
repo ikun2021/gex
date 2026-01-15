@@ -1,6 +1,6 @@
 package model
 
-import "github.com/ikun2021/gex/app/quotes/kline/rpc/internal/dao/model"
+import "github.com/ikun2021/gex/app/quote/kline/rpc/internal/dao/model"
 
 type RedisModel struct {
 	model.Kline

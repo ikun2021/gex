@@ -2,8 +2,8 @@ package model
 
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/dao/model"
-	"github.com/ikun2021/gex/app/quotes/kline/rpc/pb"
+	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/dao/model"
+	"github.com/ikun2021/gex/app/quote/kline/rpc/pb"
 	"github.com/ikun2021/gex/common/proto/define"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"

@@ -2,8 +2,9 @@ package svc
 
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/config"
-	"github.com/ikun2021/gex/app/quotes/kline/rpc/internal/dao/query"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/config"
+	"gorm.io/gen/examples/dal/query"
+
 	"github.com/ikun2021/gex/common/pkg/etcd"
 	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/proto/define"
@@ -18,11 +19,11 @@ import (
 )
 
 type ServiceContext struct {
-	Config        *config.Config
-	Query         *query.Query
-	RedisClient   *redis.Redis
-	MatchConsumer pulsar.Consumer
-	WsClient      gpushPb.ProxyClient
+	Config       *config.Config
+	Query        *query.Query
+	RedisClient  *redis.Redis
+	PulsarClient pulsar.Client
+	WsClient     gpushPb.ProxyClient
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {

@@ -21,14 +21,14 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 	for _, v := range sc.Config.Symbol {
 		go func(symbol models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:  defines.MatchTopicPrefix + symbol.Name,
+				Topic:  defines.MatchTopicInputPrefix + symbol.Name,
 				Topics: nil,
 			})
 			if err != nil {
 				logx.Severef("init match consumer error:%v", err)
 			}
 			producer, err := sc.PulsarClient.CreateProducer(pulsar.ProducerOptions{
-				Topic: defines.MatchTopicPrefix + symbol.Name,
+				Topic: defines.MatchTopicInputPrefix + symbol.Name,
 			})
 			if err != nil {
 				logx.Severef("init pulsar producer failed %v", err)

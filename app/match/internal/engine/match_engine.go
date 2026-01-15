@@ -35,6 +35,30 @@ type MatchEngine struct {
 	baseCoinPrecision  int32
 }
 
+func (m *MatchEngine) dump() {
+	fmt.Printf("⚙️  ----------------------------------------------撮合引擎详情 (Match Engine)-----------------------------------:\n")
+	fmt.Printf("🪙 交易对: %s (ID: %d)\n", m.symbolConf.Name, m.symbolConf.Id)
+	fmt.Printf("🪙 基础币ID: %d\n", m.symbolConf.BaseCoinId)
+	fmt.Printf("🪙 计价币ID: %d\n", m.symbolConf.QuoteCoinId)
+	fmt.Printf("📏 基础币精度: %d\n", m.baseCoinPrecision)
+	fmt.Printf("📏 计价币精度: %d\n", m.quoteCoinPrecision)
+	fmt.Printf("🔢 当前序列ID: %d\n", m.currentSeqId)
+	fmt.Printf("📈 最佳买价 (买一价): %s\n", m.bestBid.String())
+	fmt.Printf("📉 最佳卖价 (卖一价): %s\n", m.bestAsk.String())
+	fmt.Println("🛒 卖盘 (ASKS):")
+	if m.asks != nil {
+		m.asks.dump()
+	} else {
+		fmt.Println("  无卖盘数据")
+	}
+	fmt.Println("📥 买盘 (BIDS):")
+	if m.bids != nil {
+		m.bids.dump()
+	} else {
+		fmt.Println("  无买盘数据")
+	}
+}
+
 // MatchedRecord  一次撮合匹配的结果,一次撮合会多次匹配
 type MatchedRecord struct {
 	Price           decimal.Decimal
@@ -58,9 +82,7 @@ type MatchResult struct {
 }
 
 func (m *MatchResult) dump() {
-	fmt.Println("========================================")
-	fmt.Printf("📊 撮合结果详情 (Match Result):\n")
-	fmt.Println("----------------------------------------")
+	fmt.Printf("-------------------------------📊 撮合结果详情 (Match Result): -------------------------\n")
 	fmt.Printf("🆔 撮合ID: %s\n", m.MatchID)
 	fmt.Printf("⏰ 撮合时间: %s\n", time.Unix(0, m.MatchTime).Format("2006-01-02 15:04:05.000"))
 	fmt.Printf("📈 Taker方向: %s\n", func() string {
@@ -72,7 +94,6 @@ func (m *MatchResult) dump() {
 	fmt.Printf("🔢 匹配记录数量: %d\n", len(m.MatchedRecords))
 
 	if len(m.MatchedRecords) > 0 {
-		fmt.Println("----------------------------------------")
 		fmt.Println("📋 匹配记录详情:")
 		for i, record := range m.MatchedRecords {
 			fmt.Printf("  记录 #%d:\n", i+1)
@@ -81,9 +102,7 @@ func (m *MatchResult) dump() {
 			fmt.Printf("    💰 金额: %s\n", record.Amount.String())
 			fmt.Printf("    🔑 匹配ID: %s\n", record.MatchedRecordID)
 		}
-		fmt.Println("----------------------------------------")
 	}
-	fmt.Println("========================================")
 }
 
 type AcceptedResult struct {
@@ -102,9 +121,7 @@ type AcceptedResult struct {
 }
 
 func (a *AcceptedResult) dump() {
-	fmt.Println("========================================")
-	fmt.Printf("✅ 订单接受详情 (Accepted Result):\n")
-	fmt.Println("----------------------------------------")
+	fmt.Printf("✅ 结果订单接受详情 (Accepted Result): \n")
 	fmt.Printf("🆔 订单ID: %s\n", a.OrderId)
 	fmt.Printf("👤 用户ID: %d\n", a.Uid)
 	fmt.Printf("📈 方向: %s\n", func() string {
@@ -120,7 +137,6 @@ func (a *AcceptedResult) dump() {
 	fmt.Printf("📍 价格: %s\n", a.price)
 	fmt.Printf("💰 计价币金额: %s\n", a.quoteAmount)
 	fmt.Printf("📦 基础币数量: %s\n", a.baseAmount)
-	fmt.Println("========================================")
 }
 
 type MatchOutputMessage struct {
@@ -131,11 +147,8 @@ type MatchOutputMessage struct {
 }
 
 func (m *MatchOutputMessage) Dump() {
-	fmt.Println("========================================")
-	fmt.Printf("📤 消息输出详情 (Match Output Message):\n")
-	fmt.Println("----------------------------------------")
+	fmt.Printf("📤 --------------------------------✅ 消息输出详情 (Match Output Message): --------------------------\n")
 	fmt.Printf("🏷️  消息类型: %s (%s)\n", m.MsgType, m.MsgType.String())
-	fmt.Println("----------------------------------------")
 
 	switch m.MsgType {
 	case MsgTypeMatchResult:
@@ -159,7 +172,6 @@ func (m *MatchOutputMessage) Dump() {
 	default:
 		fmt.Printf("❓ 未知消息类型: %d\n", m.MsgType)
 	}
-	fmt.Println("========================================")
 }
 
 type MsgType int8
@@ -194,15 +206,12 @@ type CancelResult struct {
 }
 
 func (c *CancelResult) dump() {
-	fmt.Println("========================================")
-	fmt.Printf("🚫 订单取消详情 (Cancel Result):\n")
-	fmt.Println("----------------------------------------")
+	fmt.Printf("🚫 ---------------------------------订单取消详情 (Cancel Result): ---------------------------------\n")
 	fmt.Printf("🆔 取消订单ID: %d\n", c.CancelId)
 	fmt.Printf("🪙 币种ID: %d\n", c.CoinId)
 	fmt.Printf("💰 取消数量: %s\n", c.Amount)
 	fmt.Printf("👤 用户ID: %d\n", c.Uid)
 	fmt.Printf("⏰ 取消时间: %s\n", time.Unix(0, c.Ts).Format("2006-01-02 15:04:05.000"))
-	fmt.Println("========================================")
 }
 
 type AcceptedResp struct {
@@ -527,7 +536,6 @@ LOOP:
 	//更新深度数据
 
 	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
-	//m.Next <- matchMsg
 	if len(matchMsg.MatchResult.MatchedRecords) > 0 {
 		m.SendResult(matchMsg)
 	}
@@ -805,6 +813,8 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		}
 	}
 	//判断订单是否存在
+	//取消的话存在并且
+	//新增的时候
 	if (order.IsCancel && !found) || (!order.IsCancel && found) {
 		return
 	}
@@ -835,7 +845,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 			MsgType: MsgTypeCancelResult,
 		})
 	} else {
-		logx.Debugf("order = %+v bestBid = %v bestAsk=%v", order, m.bestBid, m.bestAsk)
+		m.dump()
 		switch {
 		//买单市价单
 		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_MO:
@@ -890,7 +900,6 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 
 			}
 		}
-		logx.Debugf(" bestBid = %v bestAsk=%v", m.bestBid, m.bestAsk)
 	}
 
 }

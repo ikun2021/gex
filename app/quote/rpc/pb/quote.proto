@@ -1,0 +1,146 @@
+syntax = "proto3";
+package pb;
+option go_package = "./pb";
+enum KlineType{
+  Unknown=0;
+  //1分钟
+  Min1=1;
+  //5分钟
+  Min5=2;
+  //10分钟
+  Min10=3;
+  //15分钟
+    Min15=4;
+  //30分钟
+  Min30=5;
+  //1小时
+  Hour1=6;
+  //4小时
+  Hour4=7;
+  //1天
+  Day1=8;
+  //1周
+  Week1=9;
+  //1个月
+  Month1=10;
+}
+
+message GetKlineReq{
+  //开始时间
+  int64 start_time=1;
+  //结束时间
+  int64 ent_time=2;
+  //k线类型
+  KlineType kline_type=3;
+  //交易对
+  string symbol=4;
+}
+message GetKlineResp{
+  message Kline{
+    //开
+    string open=1;
+    //高
+    string high=2;
+    //低
+    string low=3;
+    //收
+    string close=4;
+    //成交额 计价币数量
+    string volume=5;
+    //成交量 基础币数量
+    string amount=6;
+    //开始时间
+    int64 start_time=7;
+    //结束时间
+    int64 end_time=8;
+    //涨跌幅
+    string range=9;
+    //交易对
+    string symbol=10;
+  }
+  repeated Kline kline_list=1;
+}
+
+// 24小时行情
+
+message Ticker{
+  //开
+  string open=1;
+  //高
+  string high=2;
+  //低
+  string low=3;
+  //收
+  string close=4;
+  //成交额 计价币数量
+  string volume=5;
+  //成交量 基础币数量
+  string amount=6;
+  //涨跌幅
+  string range=9;
+  //交易对
+  string symbol=10;
+}
+
+message GetTickerReq{
+  //交易对
+  string symbol=1;
+}
+
+message GetTickerResp{
+  Ticker ticker=1;
+}
+message GetTickReq{
+  //交易对
+  string symbol=1;
+  //多少条
+  int32 limit=2;
+}
+message GetDepthReq{
+  //交易对
+  string symbol=1;
+  //档位
+  int32  level =2;
+}
+message GetDepthResp{
+  //订单簿版本
+  int64 version=1;
+  message Position{
+    //数量
+    string baseAmount=1;
+    //价格
+    string price=2;
+    //金额
+    string quoteAmount=3;
+  }
+  //卖盘
+  repeated  Position asks=2;
+  //买盘
+  repeated  Position bids=3;
+}
+message Tick{
+  string price = 1; //价格
+  string baseAmount = 2; //计价币数量
+  string quoteAmount = 3; //计价币数量
+  int32 side =4; //1买 2卖
+  int64 created_at=5;
+  bool  taker_is_buyer=6;
+  string symbol=7;
+}
+message GetTickResp{
+  repeated Tick tick_list=1;
+  int64 total=2;
+}
+
+
+
+service QuoteService {
+  //获取k线
+  rpc GetKline(GetKlineReq)returns(GetKlineResp);
+  //获取24小时行情
+  rpc GetTicker(GetTickerReq)returns(GetTickerResp);
+  //获取tick
+  rpc GetTick(GetTickReq)returns(GetTickResp);
+  //获取深度
+  rpc GetDepth(GetDepthReq)returns(GetDepthResp);
+}
