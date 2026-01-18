@@ -136,9 +136,9 @@ message MatchResult{
   //撮合时间
   int64  match_time = 6;
   //数量
-  string  qty = 7;
+  string  baseAmount = 7;
   //金额
-  string  amount = 11;
+  string  quoteAmount = 11;
   //最高价
   string high_price = 12;
   //最低价

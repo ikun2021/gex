@@ -1,14 +1,16 @@
-package logic
+package handler
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/consumer"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/dao/query"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/model"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/svc"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/consumer"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
+	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
+	"github.com/spf13/cast"
+
 	"github.com/ikun2021/gex/common/proto/define"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
@@ -23,11 +25,11 @@ import (
 // KlineHandler 基于utc时间
 type KlineHandler struct {
 	//存储k线
-	Klines []*model.Kline
+	Klines []*model.MemoryKline
 	//落库chan
 	storeLatestKline chan model.StoreKline
 	//发送
-	sendChan chan model.Kline
+	sendChan chan model.MemoryKline
 	//定时写入和发送的定时器
 	ticker *time.Ticker
 	//是否改变
@@ -38,6 +40,7 @@ type KlineHandler struct {
 	svcCtx          *svc.ServiceContext
 	latestMessageID pulsar.MessageID
 	latestMatchId   int64
+	matchData       chan *model.MatchData
 }
 
 func NewKlineHandler(svcCtx *svc.ServiceContext) *KlineHandler {
@@ -46,6 +49,7 @@ func NewKlineHandler(svcCtx *svc.ServiceContext) *KlineHandler {
 		sendChan:         make(chan model.Kline),
 		ticker:           time.NewTicker(300 * time.Millisecond),
 		svcCtx:           svcCtx,
+		matchData:        make(chan *model.MatchData, 10),
 	}
 
 	wrapCron, err := utils.NewWrapCron("1 * * * * ?")
@@ -53,25 +57,47 @@ func NewKlineHandler(svcCtx *svc.ServiceContext) *KlineHandler {
 		logx.Severef("init cron failed %v", err)
 	}
 	klineHandler.cron = wrapCron
+	klineHandler.start()
 	return klineHandler
+}
+
+func (kl *KlineHandler) start() {
+	kl.readInitData()
+	kl.cron.Start()
+	go kl.update()
+	go kl.store()
+	go kl.send()
+}
+func (kl *KlineHandler) Send(output *matchMq.MatchOutput_MatchResult, id pulsar.MessageID) {
+	matchData := &model.MatchData{
+		MessageID:  id,
+		MatchID:    cast.ToInt64(output.MatchResult.MatchId),
+		MatchTime:  output.MatchResult.MatchTime / 1e9,
+		Volume:     utils.NewFromStringMaxPrec(output.MatchResult.QuoteAmount).Mul(utils.NewFromStringMaxPrec("2")),
+		Amount:     utils.NewFromStringMaxPrec(output.MatchResult.BaseAmount).Mul(utils.NewFromStringMaxPrec("2")),
+		StartPrice: utils.NewFromStringMaxPrec(output.MatchResult.BeginPrice),
+		EndPrice:   utils.NewFromStringMaxPrec(output.MatchResult.EndPrice),
+		Low:        utils.NewFromStringMaxPrec(output.MatchResult.LowPrice),
+		High:       utils.NewFromStringMaxPrec(output.MatchResult.HighPrice),
+	}
+	kl.matchData <- matchData
 }
 func InitKlineHandler(svcCtx *svc.ServiceContext) {
 	handler := NewKlineHandler(svcCtx)
 	handler.readInitData()
 	handler.cron.Start()
-	matchDataChan := consumer.InitConsumer(handler.svcCtx)
-	go handler.update(matchDataChan)
+	go handler.update()
 	go handler.store()
 	go handler.send()
 }
 func (kl *KlineHandler) readInitData() {
-	klines := make([]*model.Kline, 0, len(model.KlineTypes))
+	klines := make([]*model.MemoryKline, 0, len(model.KlineTypes))
 	for _, v := range model.KlineTypes {
 
 		data, err := kl.svcCtx.RedisClient.Hget(define.Kline.WithParams(), kl.svcCtx.Config.SymbolInfo.SymbolName+"_"+v.String())
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
-				kline := &model.Kline{
+				kline := &model.MemoryKline{
 					StartTime:   0,
 					EndTime:     0,
 					KlineType:   v,
@@ -94,7 +120,7 @@ func (kl *KlineHandler) readInitData() {
 			logx.Severef("unmarshal kline data failed err=%v", err)
 		}
 
-		kline := &model.Kline{
+		kline := &model.MemoryKline{
 			KlineType:   model.KlineType(d.KlineType),
 			StartTime:   d.StartTime,
 			EndTime:     d.EndTime,
@@ -112,10 +138,10 @@ func (kl *KlineHandler) readInitData() {
 	kl.Klines = klines
 
 }
-func (kl *KlineHandler) update(matchData <-chan *model.MatchData) {
+func (kl *KlineHandler) update() {
 	for {
 		select {
-		case md := <-matchData:
+		case md := <-kl.matchData:
 			kl.updateLatestKline(md, false)
 			kl.changed = true
 			kl.latestMessageID = md.MessageID
@@ -125,7 +151,7 @@ func (kl *KlineHandler) update(matchData <-chan *model.MatchData) {
 				kl.snapshot()
 			}
 			kl.changed = false
-			//定时在每分钟的开始输入一个成交量和成交额为0的订单。
+			//定时在每分钟的开始输入一个成交量和成交额为0的订单。避免出现空数据。
 		case <-kl.cron.C:
 			kl.updateLatestKline(nil, true)
 			kl.changed = true

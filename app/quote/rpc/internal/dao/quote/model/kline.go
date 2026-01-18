@@ -2,8 +2,8 @@ package model
 
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/internal/dao/model"
-	"github.com/ikun2021/gex/app/quote/kline/rpc/pb"
+	"github.com/ikun2021/gex/app/quote/rpc/pb"
+
 	"github.com/ikun2021/gex/common/proto/define"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
@@ -17,7 +17,7 @@ type StoreKline struct {
 	MatchID   int64
 }
 
-type Kline struct {
+type MemoryKline struct {
 	KlineType   KlineType
 	StartTime   int64           //周期的开始时间
 	EndTime     int64           //周期的结束时间
@@ -31,8 +31,8 @@ type Kline struct {
 	InitMatchID int64
 }
 
-func (k *Kline) Copy() Kline {
-	return Kline{
+func (k *MemoryKline) Copy() MemoryKline {
+	return MemoryKline{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
 		KlineType: k.KlineType,
@@ -46,8 +46,8 @@ func (k *Kline) Copy() Kline {
 	}
 }
 
-func (k *Kline) CastToMysqlData(symbolInfo *define.SymbolInfo) *model.Kline {
-	return &model.Kline{
+func (k *MemoryKline) CastToMysqlData(symbolInfo *define.SymbolInfo) *Kline {
+	return &Kline{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
 		Symbol:    symbolInfo.SymbolName,
@@ -62,9 +62,9 @@ func (k *Kline) CastToMysqlData(symbolInfo *define.SymbolInfo) *model.Kline {
 		Range:     k.Range,
 	}
 }
-func (k *Kline) CastToRedisData(symbolInfo *define.SymbolInfo, matchID int64) *RedisModel {
+func (k *MemoryKline) CastToRedisData(symbolInfo *define.SymbolInfo, matchID int64) *RedisModel {
 	return &RedisModel{
-		Kline: model.Kline{
+		Kline: Kline{
 			StartTime: k.StartTime,
 			EndTime:   k.EndTime,
 			Symbol:    symbolInfo.SymbolName,
@@ -82,7 +82,7 @@ func (k *Kline) CastToRedisData(symbolInfo *define.SymbolInfo, matchID int64) *R
 	}
 }
 
-func (k *Kline) CastToWsData(symbolInfo *define.SymbolInfo) commonWs.Kline {
+func (k *MemoryKline) CastToWsData(symbolInfo *define.SymbolInfo) commonWs.Kline {
 	return commonWs.Kline{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,

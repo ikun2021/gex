@@ -23,8 +23,8 @@ type Config struct {
 }
 
 const (
-	Ticker = "ticker_"
-	Tick   = "tick_"
-	Kline  = "kline_"
-	Depth  = "depth_"
+	Ticker = "ticker"
+	Tick   = "tick"
+	Kline  = "kline"
+	Depth  = "depth"
 )

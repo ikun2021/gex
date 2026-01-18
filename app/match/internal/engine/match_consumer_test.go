@@ -10,9 +10,7 @@ import (
 	"github.com/ikun2021/gex/common/proto/enum"
 	"github.com/shopspring/decimal"
 	"github.com/yitter/idgenerator-go/idgen"
-	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/core/stringx"
-	"github.com/zeromicro/go-zero/zrpc"
 	"reflect"
 	"time"
 
@@ -39,8 +37,6 @@ func TestMatch(t *testing.T) {
 			Id:        2,
 			Precision: 6,
 		}},
-		OrderRpcConf:     zrpc.RpcClientConf{},
-		RedisConf:        redis.RedisConf{},
 		EtcdRegisterConf: etcd.EtcdRegisterConf{},
 	}, nil)
 
@@ -110,8 +106,6 @@ func TestMatchCancel(t *testing.T) {
 			Id:        2,
 			Precision: 6,
 		}},
-		OrderRpcConf:     zrpc.RpcClientConf{},
-		RedisConf:        redis.RedisConf{},
 		EtcdRegisterConf: etcd.EtcdRegisterConf{},
 	}, nil)
 
