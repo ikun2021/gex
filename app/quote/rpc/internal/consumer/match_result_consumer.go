@@ -26,7 +26,7 @@ func InitConsumer(sc *svc.ServiceContext) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
 				SubscriptionName: config.Tick,
-				Type:             pulsar.Shared,
+				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
 				logx.Severef("init consumer failed %v", err)
@@ -75,12 +75,12 @@ func InitConsumer(sc *svc.ServiceContext) {
 						MessageID:  message.ID(),
 						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
 						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromStringMaxPrec(r.MatchResult.Amount).Mul(utils.NewFromStringMaxPrec("2")),
-						Amount:     utils.NewFromStringMaxPrec(r.MatchResult.Qty).Mul(utils.NewFromStringMaxPrec("2")),
-						StartPrice: utils.NewFromStringMaxPrec(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromStringMaxPrec(r.MatchResult.EndPrice),
-						Low:        utils.NewFromStringMaxPrec(r.MatchResult.LowPrice),
-						High:       utils.NewFromStringMaxPrec(r.MatchResult.HighPrice),
+						Volume:     utils.NewFromString(r.MatchResult.Amount).Mul(utils.NewFromString("2")),
+						Amount:     utils.NewFromString(r.MatchResult.Qty).Mul(utils.NewFromString("2")),
+						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
+						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
+						Low:        utils.NewFromString(r.MatchResult.LowPrice),
+						High:       utils.NewFromString(r.MatchResult.HighPrice),
 					}
 					md <- matchData
 				}
@@ -118,12 +118,12 @@ func InitConsumer(sc *svc.ServiceContext) {
 						MessageID:  message.ID(),
 						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
 						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromStringMaxPrec(r.MatchResult.Amount).Mul(utils.NewFromStringMaxPrec("2")),
-						Amount:     utils.NewFromStringMaxPrec(r.MatchResult.Qty).Mul(utils.NewFromStringMaxPrec("2")),
-						StartPrice: utils.NewFromStringMaxPrec(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromStringMaxPrec(r.MatchResult.EndPrice),
-						Low:        utils.NewFromStringMaxPrec(r.MatchResult.LowPrice),
-						High:       utils.NewFromStringMaxPrec(r.MatchResult.HighPrice),
+						Volume:     utils.NewFromString(r.MatchResult.Amount).Mul(utils.NewFromString("2")),
+						Amount:     utils.NewFromString(r.MatchResult.Qty).Mul(utils.NewFromString("2")),
+						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
+						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
+						Low:        utils.NewFromString(r.MatchResult.LowPrice),
+						High:       utils.NewFromString(r.MatchResult.HighPrice),
 					}
 					md <- matchData
 				}
@@ -161,12 +161,12 @@ func InitConsumer(sc *svc.ServiceContext) {
 						MessageID:  message.ID(),
 						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
 						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromStringMaxPrec(r.MatchResult.QuoteAmount).Mul(utils.NewFromStringMaxPrec("2")),
-						Amount:     utils.NewFromStringMaxPrec(r.MatchResult.BaseAmount).Mul(utils.NewFromStringMaxPrec("2")),
-						StartPrice: utils.NewFromStringMaxPrec(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromStringMaxPrec(r.MatchResult.EndPrice),
-						Low:        utils.NewFromStringMaxPrec(r.MatchResult.LowPrice),
-						High:       utils.NewFromStringMaxPrec(r.MatchResult.HighPrice),
+						Volume:     utils.NewFromString(r.MatchResult.QuoteAmount).Mul(utils.NewFromString("2")),
+						Amount:     utils.NewFromString(r.MatchResult.BaseAmount).Mul(utils.NewFromString("2")),
+						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
+						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
+						Low:        utils.NewFromString(r.MatchResult.LowPrice),
+						High:       utils.NewFromString(r.MatchResult.HighPrice),
 					}
 					md <- matchData
 				}

@@ -56,7 +56,7 @@ ORDER BY
 	}
 	list := make([]*types.MatchInfo, 0, len(data))
 	for _, v := range data {
-		avgPrice := utils.NewFromStringMaxPrec(v.TotalAmount).Div(utils.NewFromStringMaxPrec(v.TotalQty))
+		avgPrice := utils.NewFromString(v.TotalAmount).Div(utils.NewFromString(v.TotalQty))
 		m := &types.MatchInfo{
 			ID:          v.ID,
 			MatchID:     v.MatchID,

@@ -67,7 +67,7 @@ func (l *AddUserAssetLogic) AddUserAsset(in *pb.AddUserAssetReq) (*pb.Empty, err
 			logx.Errorw("AddUserAsset query asset record failed", logger.ErrorField(err))
 			return errs.Internal
 		}
-		s := utils.NewFromStringMaxPrec(userAsset.AvailableQty).Add(utils.NewFromStringMaxPrec(in.Qty)).String()
+		s := utils.NewFromString(userAsset.AvailableQty).Add(utils.NewFromString(in.Qty)).String()
 		userAsset.AvailableQty = s
 		if _, err := tx.Asset.WithContext(l.ctx).Updates(userAsset); err != nil {
 			logx.Errorw("AddUserAsset update asset record failed", logger.ErrorField(err))

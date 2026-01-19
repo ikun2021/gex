@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/consumer"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/query"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
-	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
-	"github.com/spf13/cast"
-
+	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/define"
+	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
 	gpush "github.com/luxun9527/gpush/proto"
 	logger "github.com/luxun9527/zlog"
+	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"gorm.io/gorm/clause"
@@ -35,21 +35,23 @@ type KlineHandler struct {
 	//是否改变
 	changed bool
 	//提交方式
-
+	consumer        pulsar.Consumer
 	cron            *utils.WrapCron
 	svcCtx          *svc.ServiceContext
 	latestMessageID pulsar.MessageID
 	latestMatchId   int64
 	matchData       chan *model.MatchData
+	symbolInfo      models.Symbol
 }
 
-func NewKlineHandler(svcCtx *svc.ServiceContext) *KlineHandler {
+func NewKlineHandler(svcCtx *svc.ServiceContext, symbolInfo models.Symbol) *KlineHandler {
 	klineHandler := &KlineHandler{
 		storeLatestKline: make(chan model.StoreKline),
-		sendChan:         make(chan model.Kline),
+		sendChan:         make(chan model.MemoryKline),
 		ticker:           time.NewTicker(300 * time.Millisecond),
 		svcCtx:           svcCtx,
 		matchData:        make(chan *model.MatchData, 10),
+		symbolInfo:       symbolInfo,
 	}
 
 	wrapCron, err := utils.NewWrapCron("1 * * * * ?")
@@ -73,28 +75,21 @@ func (kl *KlineHandler) Send(output *matchMq.MatchOutput_MatchResult, id pulsar.
 		MessageID:  id,
 		MatchID:    cast.ToInt64(output.MatchResult.MatchId),
 		MatchTime:  output.MatchResult.MatchTime / 1e9,
-		Volume:     utils.NewFromStringMaxPrec(output.MatchResult.QuoteAmount).Mul(utils.NewFromStringMaxPrec("2")),
-		Amount:     utils.NewFromStringMaxPrec(output.MatchResult.BaseAmount).Mul(utils.NewFromStringMaxPrec("2")),
-		StartPrice: utils.NewFromStringMaxPrec(output.MatchResult.BeginPrice),
-		EndPrice:   utils.NewFromStringMaxPrec(output.MatchResult.EndPrice),
-		Low:        utils.NewFromStringMaxPrec(output.MatchResult.LowPrice),
-		High:       utils.NewFromStringMaxPrec(output.MatchResult.HighPrice),
+		Volume:     utils.NewFromString(output.MatchResult.QuoteAmount).Mul(utils.NewFromString("2")),
+		Amount:     utils.NewFromString(output.MatchResult.BaseAmount).Mul(utils.NewFromString("2")),
+		StartPrice: utils.NewFromString(output.MatchResult.BeginPrice),
+		EndPrice:   utils.NewFromString(output.MatchResult.EndPrice),
+		Low:        utils.NewFromString(output.MatchResult.LowPrice),
+		High:       utils.NewFromString(output.MatchResult.HighPrice),
 	}
 	kl.matchData <- matchData
 }
-func InitKlineHandler(svcCtx *svc.ServiceContext) {
-	handler := NewKlineHandler(svcCtx)
-	handler.readInitData()
-	handler.cron.Start()
-	go handler.update()
-	go handler.store()
-	go handler.send()
-}
+
 func (kl *KlineHandler) readInitData() {
 	klines := make([]*model.MemoryKline, 0, len(model.KlineTypes))
 	for _, v := range model.KlineTypes {
 
-		data, err := kl.svcCtx.RedisClient.Hget(define.Kline.WithParams(), kl.svcCtx.Config.SymbolInfo.SymbolName+"_"+v.String())
+		data, err := kl.svcCtx.RedisClient.Hget(define.Kline.WithParams(), kl.symbolInfo.Name+"_"+v.String())
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
 				kline := &model.MemoryKline{
@@ -124,12 +119,12 @@ func (kl *KlineHandler) readInitData() {
 			KlineType:   model.KlineType(d.KlineType),
 			StartTime:   d.StartTime,
 			EndTime:     d.EndTime,
-			Amount:      utils.NewFromStringMaxPrec(d.Volume),
-			Volume:      utils.NewFromStringMaxPrec(d.Amount),
-			Open:        utils.NewFromStringMaxPrec(d.Open),
-			High:        utils.NewFromStringMaxPrec(d.High),
-			Low:         utils.NewFromStringMaxPrec(d.Low),
-			Close:       utils.NewFromStringMaxPrec(d.Close),
+			Amount:      utils.NewFromString(d.Volume),
+			Volume:      utils.NewFromString(d.Amount),
+			Open:        utils.NewFromString(d.Open),
+			High:        utils.NewFromString(d.High),
+			Low:         utils.NewFromString(d.Low),
+			Close:       utils.NewFromString(d.Close),
 			Range:       d.Range,
 			InitMatchID: d.MatchID,
 		}
@@ -161,60 +156,66 @@ func (kl *KlineHandler) update() {
 
 // 存储历史k线和最新的k线
 func (kl *KlineHandler) store() {
-	k := kl.svcCtx.Query.Kline
+	klineDB := kl.svcCtx.GenDB.Kline
 	for klineData := range kl.storeLatestKline {
-		//存储历史k线
-		if klineData.IsHistory {
-			err := kl.svcCtx.Query.Transaction(func(tx *query.Query) error {
-				for _, v := range klineData.Klines {
-					mysqlData := v.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)
-					logx.Infow("store history kline data", logx.Field("data", mysqlData))
-					onUpdate := map[string]interface{}{
-						k.Open.ColumnName().String():   mysqlData.Open,
-						k.High.ColumnName().String():   mysqlData.High,
-						k.Low.ColumnName().String():    mysqlData.Low,
-						k.Close.ColumnName().String():  mysqlData.Close,
-						k.Amount.ColumnName().String(): mysqlData.Amount,
-						k.Volume.ColumnName().String(): mysqlData.Volume,
-						k.Range.ColumnName().String():  mysqlData.Range,
+		for {
+			//存储历史k线
+			if klineData.IsHistory {
+				err := kl.svcCtx.GenDB.Transaction(func(tx *query.Query) error {
+					for _, v := range klineData.Klines {
+						mysqlData := v.CastToMysqlData(kl.symbolInfo)
+						logx.Infow("store history kline data", logx.Field("data", mysqlData))
+						onUpdate := map[string]interface{}{
+							klineDB.Open.ColumnName().String():   mysqlData.Open,
+							klineDB.High.ColumnName().String():   mysqlData.High,
+							klineDB.Low.ColumnName().String():    mysqlData.Low,
+							klineDB.Close.ColumnName().String():  mysqlData.Close,
+							klineDB.Amount.ColumnName().String(): mysqlData.Amount,
+							klineDB.Volume.ColumnName().String(): mysqlData.Volume,
+							klineDB.Range.ColumnName().String():  mysqlData.Range,
+						}
+						if err := klineDB.WithContext(context.Background()).
+							Clauses(clause.OnConflict{
+								DoUpdates: clause.Assignments(onUpdate),
+							}).
+							Create(mysqlData); err != nil {
+							logx.Errorw("store history kline data failed", logx.Field("data", mysqlData), logx.Field("err", err))
+							return err
+						}
 					}
-					if err := k.WithContext(context.Background()).
-						Clauses(clause.OnConflict{
-							DoUpdates: clause.Assignments(onUpdate),
-						}).
-						Create(mysqlData); err != nil {
-						logx.Errorw("store history kline data failed", logx.Field("data", mysqlData), logx.Field("err", err))
-						return err
-					}
+
+					return nil
+				})
+				if err != nil {
+					logx.Errorf("store message to mysql failed err = %v message id %v", err, kl.latestMessageID)
+					time.Sleep(time.Second * 3)
 				}
 
-				return nil
-			})
-			if err != nil {
-				logx.Severef("store message to mysql failed err = %v message id %v", err, kl.latestMessageID)
-			}
-
-		} else {
-			if err := kl.svcCtx.Query.Transaction(func(tx *query.Query) error {
-				for _, v := range klineData.Klines {
-					data := v.CastToRedisData(kl.svcCtx.Config.SymbolInfo, klineData.MatchID)
-					d, _ := json.Marshal(data)
-					if err := kl.svcCtx.RedisClient.Hset(define.Kline.WithParams(), data.Symbol+"_"+v.KlineType.String(), string(d)); err != nil {
-						logx.Errorw("update last kline failed", logger.ErrorField(err))
-						return err
+			} else {
+				//存储最新的k线
+				if err := kl.svcCtx.GenDB.Transaction(func(tx *query.Query) error {
+					for _, v := range klineData.Klines {
+						data := v.CastToRedisData(kl.symbolInfo, klineData.MatchID)
+						d, _ := json.Marshal(data)
+						if err := kl.svcCtx.RedisClient.Hset(define.Kline.WithParams(), data.Symbol+"_"+v.KlineType.String(), string(d)); err != nil {
+							logx.Errorw("update last kline failed", logger.ErrorField(err))
+							return err
+						}
 					}
-				}
 
-				if klineData.MessageID != nil {
-					if err := kl.svcCtx.MatchConsumer.AckIDCumulative(kl.latestMessageID); err != nil {
-						logx.Errorw("consumer message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
-						return err
+					if klineData.MessageID != nil {
+						if err := kl.consumer.AckIDCumulative(kl.latestMessageID); err != nil {
+							logx.Errorw("consumer message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
+							return err
+						}
 					}
-				}
 
-				return nil
-			}); err != nil {
-				logx.Severef("store last kline failed err=%v", err)
+					return nil
+				}); err != nil {
+					logx.Errorf("store last kline failed err=%v", err)
+					time.Sleep(time.Second * 3)
+
+				}
 			}
 		}
 
@@ -222,7 +223,7 @@ func (kl *KlineHandler) store() {
 }
 
 func (kl *KlineHandler) snapshot() {
-	latestKline := make([]*model.Kline, 0, len(kl.Klines))
+	latestKline := make([]*model.MemoryKline, 0, len(kl.Klines))
 	for _, v := range kl.Klines {
 		t := *v
 		kl.sendChan <- t
@@ -240,11 +241,11 @@ func (kl *KlineHandler) snapshot() {
 func (kl *KlineHandler) send() {
 	for data := range kl.sendChan {
 		msg := commonWs.Message[commonWs.Kline]{
-			Topic:   commonWs.KlinePrefix.WithParam(kl.svcCtx.Config.SymbolInfo.SymbolName) + "@" + data.KlineType.String(),
-			Payload: data.CastToWsData(kl.svcCtx.Config.SymbolInfo),
+			Topic:   commonWs.KlinePrefix.WithParam(kl.symbolInfo.Name) + "@" + data.KlineType.String(),
+			Payload: data.CastToWsData(kl.symbolInfo),
 		}
 		if _, err := kl.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
-			Topic: commonWs.KlinePrefix.WithParam(kl.svcCtx.Config.SymbolInfo.SymbolName) + "@" + data.KlineType.String(),
+			Topic: commonWs.KlinePrefix.WithParam(kl.symbolInfo.Name) + "@" + data.KlineType.String(),
 			Data:  msg.ToBytes(),
 		}); err != nil {
 			logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
@@ -256,7 +257,7 @@ func (kl *KlineHandler) send() {
 func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 	logx.Debugw("update latest kline  data ", logx.Field("data", data))
 	for _, klineData := range kl.Klines {
-		logx.Debugw("before update ", logx.Field("klineData", klineData.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)))
+		logx.Debugw("before update ", logx.Field("klineData", klineData.CastToMysqlData(kl.symbolInfo)))
 
 		// 小于初始化matchID的直接返回。
 		if data != nil && data.MatchID != 0 && data.MatchID <= klineData.InitMatchID {
@@ -306,7 +307,7 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 			klineData.Amount = data.Amount
 			klineData.Volume = data.Volume
 			klineData.Range = "0"
-			logx.Debugw("init kline after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)))
+			logx.Debugw("init kline after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.symbolInfo)))
 			continue
 		}
 
@@ -328,10 +329,10 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 					k.StartTime = k.StartTime + int64(klineData.KlineType.GetCycle())*i
 					k.EndTime = k.StartTime + int64(klineData.KlineType.GetCycle())
 					sk := model.StoreKline{
-						Klines:    []*model.Kline{&k},
+						Klines:    []*model.MemoryKline{&k},
 						IsHistory: true,
 					}
-					logx.Sloww("fix missing kline ", logx.Field("data", k.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)))
+					logx.Sloww("fix missing kline ", logx.Field("data", k.CastToMysqlData(kl.symbolInfo)))
 					kl.storeLatestKline <- sk
 				}
 			}
@@ -346,18 +347,18 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 			klineData.Amount = data.Amount
 			klineData.Volume = data.Volume
 			if !klineData.Open.Equal(utils.DecimalZeroMaxPrec) {
-				klineData.Range = data.EndPrice.Sub(klineData.Open).Div(klineData.Open).Mul(utils.NewFromStringMaxPrec("100")).StringFixedBank(3)
+				klineData.Range = data.EndPrice.Sub(klineData.Open).Div(klineData.Open).Mul(utils.NewFromString("100")).StringFixedBank(3)
 			}
 			newKline := *klineData
 
 			sk := model.StoreKline{
-				Klines:    []*model.Kline{&historyKline},
+				Klines:    []*model.MemoryKline{&historyKline},
 				IsHistory: true,
 			}
 			kl.sendChan <- historyKline
 			kl.sendChan <- newKline
 			kl.storeLatestKline <- sk
-			logx.Debugw("generate new kline after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)))
+			logx.Debugw("generate new kline after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.symbolInfo)))
 			continue
 		}
 		//比较高低，累加成交量成交额
@@ -383,10 +384,10 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 			klineData.Low = data.Low
 		}
 		if !klineData.Open.Equal(utils.DecimalZeroMaxPrec) {
-			klineData.Range = data.EndPrice.Sub(klineData.Open).Div(klineData.Open).Mul(utils.NewFromStringMaxPrec("100")).StringFixedBank(3)
+			klineData.Range = data.EndPrice.Sub(klineData.Open).Div(klineData.Open).Mul(utils.NewFromString("100")).StringFixedBank(3)
 		}
 		klineData.Close = data.EndPrice
-		logx.Debugw("after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.svcCtx.Config.SymbolInfo)))
+		logx.Debugw("after update ", logx.Field("klineData", klineData.CastToMysqlData(kl.symbolInfo)))
 
 	}
 }

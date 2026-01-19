@@ -3,6 +3,7 @@ package svc
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/config"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/query"
 	"github.com/yitter/idgenerator-go/idgen"
 	"gorm.io/gorm"
 
@@ -16,6 +17,7 @@ import (
 type ServiceContext struct {
 	Config       *config.Config
 	DB           *gorm.DB
+	GenDB        *query.Query
 	RedisClient  *redis.Redis
 	PulsarClient pulsar.Client
 	TradeIdgen   *idgen.DefaultIdGenerator
@@ -36,6 +38,8 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	if err != nil {
 		logx.Severef("init pulsar client failed %v", err)
 	}
+	db := c.GormConf.MustNewGormClient()
+	genDB := query.Use(db)
 
 	sc := &ServiceContext{
 		Config:       c,
@@ -43,6 +47,8 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		RedisClient:  redis.MustNewRedis(c.RedisConf),
 		PulsarClient: client,
 		WsClient:     gpushPb.NewProxyClient(zrpc.MustNewClient(c.WsConf).Conn()),
+		DB:           db,
+		GenDB:        genDB,
 	}
 	return sc
 }

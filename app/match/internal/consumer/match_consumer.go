@@ -55,15 +55,15 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 						SequenceId:          event.CreateOrder.SequenceId,
 						CreateTime:          0,
 						IsCancel:            false,
-						Price:               utils.NewFromStringMaxPrec(event.CreateOrder.Price),
-						BaseAmount:          utils.NewFromStringMaxPrec(event.CreateOrder.BaseAmount),
+						Price:               utils.NewFromString(event.CreateOrder.Price),
+						BaseAmount:          utils.NewFromString(event.CreateOrder.BaseAmount),
 						OrderType:           event.CreateOrder.OrderType,
-						QuoteAmount:         utils.NewFromStringMaxPrec(event.CreateOrder.QuoteAmount),
+						QuoteAmount:         utils.NewFromString(event.CreateOrder.QuoteAmount),
 						Side:                event.CreateOrder.Side,
 						OrderStatus:         enum.OrderStatus_NewCreated,
-						UnfilledBaseAmount:  utils.NewFromStringMaxPrec(event.CreateOrder.BaseAmount),
+						UnfilledBaseAmount:  utils.NewFromString(event.CreateOrder.BaseAmount),
 						FilledBaseAmount:    utils.DecimalZeroMaxPrec,
-						UnfilledQuoteAmount: utils.NewFromStringMaxPrec(event.CreateOrder.QuoteAmount),
+						UnfilledQuoteAmount: utils.NewFromString(event.CreateOrder.QuoteAmount),
 						FilledQuoteAmount:   utils.DecimalZeroMaxPrec,
 					}
 					me.HandleOrder(order)
@@ -76,7 +76,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 						Side:       event.CancelOrder.Side,
 						Uid:        0,
 						OrderType:  event.CancelOrder.OrderType,
-						Price:      utils.NewFromStringMaxPrec(event.CancelOrder.Price),
+						Price:      utils.NewFromString(event.CancelOrder.Price),
 					}
 					me.HandleOrder(order)
 				}

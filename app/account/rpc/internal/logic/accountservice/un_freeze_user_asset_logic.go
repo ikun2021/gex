@@ -70,13 +70,13 @@ func (l *UnFreezeUserAssetLogic) UnFreezeUserAsset(in *pb.FreezeUserAssetReq) (*
 			return errs.UserNotFound
 		}
 
-		frozenQty := utils.NewFromStringMaxPrec(userAsset.FrozenQty)
-		qty := utils.NewFromStringMaxPrec(in.Qty)
+		frozenQty := utils.NewFromString(userAsset.FrozenQty)
+		qty := utils.NewFromString(in.Qty)
 		if frozenQty.LessThan(qty) {
 			return errs.AmountInsufficient
 		}
 
-		userAsset.FrozenQty = utils.NewFromStringMaxPrec(userAsset.FrozenQty).Sub(qty).String()
+		userAsset.FrozenQty = utils.NewFromString(userAsset.FrozenQty).Sub(qty).String()
 		userAsset.AvailableQty = frozenQty.Add(qty).String()
 
 		updateSql := underlyingDB.ToSQL(func(tx *gorm.DB) *gorm.DB {

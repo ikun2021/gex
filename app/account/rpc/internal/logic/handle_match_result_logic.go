@@ -50,21 +50,21 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_Mat
 		if result.MatchResult.TakerIsBuy {
 			//taker 扣冻结计价币
 			//usedAmount := result.MatchResult.MatchedRecord[i].Taker.UsedAmount
-			//s := utils.NewFromStringMaxPrec(usedAmount).Add(utils.NewFromStringMaxPrec(result.MatchResult.Amount))
-			//availableQty := utils.NewFromStringMaxPrec(takerQuoteCoin.AvailableQty).Add(s).String()
+			//s := utils.NewFromString(usedAmount).Add(utils.NewFromString(result.MatchResult.Amount))
+			//availableQty := utils.NewFromString(takerQuoteCoin.AvailableQty).Add(s).String()
 			//减去冻结计价币
 			//冻结的金额 更新为订单的总金额减未成交的金额
-			frozenQty := utils.NewFromStringMaxPrec(takerQuoteCoin.FrozenQty).Sub(utils.NewFromStringMaxPrec(result.MatchResult.MatchedRecord[i].Taker.UnFrozenAmount)).String()
+			frozenQty := utils.NewFromString(takerQuoteCoin.FrozenQty).Sub(utils.NewFromString(result.MatchResult.MatchedRecord[i].Taker.UnFrozenAmount)).String()
 			//加上 要解冻的金额,减成交的金额 解冻的金额要比成交的金额多
-			a := utils.NewFromStringMaxPrec(result.MatchResult.MatchedRecord[i].Taker.UnFrozenAmount).Sub(utils.NewFromStringMaxPrec(result.MatchResult.MatchedRecord[i].Taker.FilledAmount))
-			availableQty := utils.NewFromStringMaxPrec(takerQuoteCoin.AvailableQty).Add(a).String()
+			a := utils.NewFromString(result.MatchResult.MatchedRecord[i].Taker.UnFrozenAmount).Sub(utils.NewFromString(result.MatchResult.MatchedRecord[i].Taker.FilledAmount))
+			availableQty := utils.NewFromString(takerQuoteCoin.AvailableQty).Add(a).String()
 			if _, err := assetDo.
 				Where(asset.ID.Eq(takerQuoteCoin.ID)).
 				UpdateSimple(asset.FrozenQty.Value(frozenQty), asset.AvailableQty.Value(availableQty)); err != nil {
 				return err
 			}
 			//taker 加可用基础币
-			qty := utils.NewFromStringMaxPrec(takerBaseCoin.AvailableQty).Add(utils.NewFromStringMaxPrec(result.MatchResult.Qty))
+			qty := utils.NewFromString(takerBaseCoin.AvailableQty).Add(utils.NewFromString(result.MatchResult.Qty))
 			if _, err := assetDo.
 				Where(asset.ID.Eq(takerBaseCoin.ID)).
 				Update(asset.AvailableQty, qty); err != nil {
@@ -73,14 +73,14 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_Mat
 
 		} else {
 			//taker 减冻结基础币
-			qty := utils.NewFromStringMaxPrec(takerBaseCoin.FrozenQty).Sub(utils.NewFromStringMaxPrec(result.MatchResult.Qty))
+			qty := utils.NewFromString(takerBaseCoin.FrozenQty).Sub(utils.NewFromString(result.MatchResult.Qty))
 			if _, err := assetDo.
 				Where(asset.ID.Eq(takerBaseCoin.ID)).
 				Update(asset.FrozenQty, qty); err != nil {
 				return err
 			}
 			//taker 加可用计价币
-			amount := utils.NewFromStringMaxPrec(takerQuoteCoin.AvailableQty).Add(utils.NewFromStringMaxPrec(result.MatchResult.Amount))
+			amount := utils.NewFromString(takerQuoteCoin.AvailableQty).Add(utils.NewFromString(result.MatchResult.Amount))
 			if _, err := assetDo.
 				Where(asset.ID.Eq(takerQuoteCoin.ID)).
 				Update(asset.AvailableQty, amount); err != nil {
@@ -111,14 +111,14 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_Mat
 			}
 			if result.MatchResult.TakerIsBuy {
 				//maker 减冻结基础币
-				makerBaseCoin.FrozenQty = utils.NewFromStringMaxPrec(makerBaseCoin.FrozenQty).Sub(utils.NewFromStringMaxPrec(v.Qty)).String()
+				makerBaseCoin.FrozenQty = utils.NewFromString(makerBaseCoin.FrozenQty).Sub(utils.NewFromString(v.Qty)).String()
 				if _, err := assetDo.
 					Where(asset.ID.Eq(makerBaseCoin.ID)).
 					Update(asset.FrozenQty, makerBaseCoin.FrozenQty); err != nil {
 					return err
 				}
 				//maker 加可用计价币
-				makerQuoteCoin.AvailableQty = utils.NewFromStringMaxPrec(makerQuoteCoin.AvailableQty).Add(utils.NewFromStringMaxPrec(v.Amount)).String()
+				makerQuoteCoin.AvailableQty = utils.NewFromString(makerQuoteCoin.AvailableQty).Add(utils.NewFromString(v.Amount)).String()
 				if _, err := assetDo.
 					Where(asset.ID.Eq(makerQuoteCoin.ID)).
 					Update(asset.AvailableQty, makerQuoteCoin.AvailableQty); err != nil {
@@ -126,14 +126,14 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_Mat
 				}
 			} else {
 				//maker 扣冻结计价币
-				makerQuoteCoin.FrozenQty = utils.NewFromStringMaxPrec(makerQuoteCoin.FrozenQty).Sub(utils.NewFromStringMaxPrec(v.Amount)).String()
+				makerQuoteCoin.FrozenQty = utils.NewFromString(makerQuoteCoin.FrozenQty).Sub(utils.NewFromString(v.Amount)).String()
 				if _, err := assetDo.
 					Where(asset.ID.Eq(makerQuoteCoin.ID)).
 					Update(asset.FrozenQty, makerQuoteCoin.FrozenQty); err != nil {
 					return err
 				}
 				//maker 加可用基础币
-				makerBaseCoin.AvailableQty = utils.NewFromStringMaxPrec(makerBaseCoin.AvailableQty).Add(utils.NewFromStringMaxPrec(v.Qty)).String()
+				makerBaseCoin.AvailableQty = utils.NewFromString(makerBaseCoin.AvailableQty).Add(utils.NewFromString(v.Qty)).String()
 				if _, err := assetDo.
 					Where(asset.ID.Eq(makerBaseCoin.ID)).
 					Update(asset.AvailableQty, makerBaseCoin.AvailableQty); err != nil {
@@ -173,9 +173,9 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.MatchResp
 			return err
 		}
 		logx.Debugw("[cancel] before update", logx.Field("assetDetail", assetDetail), logx.Field("Qty", cancelResp.Cancel.Qty))
-		q := utils.NewFromStringMaxPrec(cancelResp.Cancel.Qty)
-		frozenQty := utils.NewFromStringMaxPrec(assetDetail.FrozenQty).Sub(q)
-		availableQty := utils.NewFromStringMaxPrec(assetDetail.AvailableQty).Add(q)
+		q := utils.NewFromString(cancelResp.Cancel.Qty)
+		frozenQty := utils.NewFromString(assetDetail.FrozenQty).Sub(q)
+		availableQty := utils.NewFromString(assetDetail.AvailableQty).Add(q)
 		logx.Debugw("[cancel] after update", logx.Field("frozenQty", frozenQty), logx.Field("availableQty", availableQty))
 		_, err = tx.Asset.WithContext(context.Background()).
 			Where(asset.ID.Eq(assetDetail.ID)).

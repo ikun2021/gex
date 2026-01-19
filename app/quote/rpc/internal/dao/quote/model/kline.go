@@ -3,15 +3,15 @@ package model
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/quote/rpc/pb"
+	"github.com/ikun2021/gex/common/models"
 
-	"github.com/ikun2021/gex/common/proto/define"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
 	"github.com/shopspring/decimal"
 )
 
 type StoreKline struct {
-	Klines    []*Kline
+	Klines    []*MemoryKline
 	MessageID pulsar.MessageID
 	IsHistory bool
 	MatchID   int64
@@ -46,12 +46,12 @@ func (k *MemoryKline) Copy() MemoryKline {
 	}
 }
 
-func (k *MemoryKline) CastToMysqlData(symbolInfo *define.SymbolInfo) *Kline {
+func (k *MemoryKline) CastToMysqlData(symbolInfo models.Symbol) *Kline {
 	return &Kline{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
-		Symbol:    symbolInfo.SymbolName,
-		SymbolID:  symbolInfo.SymbolID,
+		Symbol:    symbolInfo.Name,
+		SymbolID:  symbolInfo.Id,
 		KlineType: int32(k.KlineType),
 		Open:      k.Open.String(),
 		High:      k.High.String(),
@@ -62,13 +62,13 @@ func (k *MemoryKline) CastToMysqlData(symbolInfo *define.SymbolInfo) *Kline {
 		Range:     k.Range,
 	}
 }
-func (k *MemoryKline) CastToRedisData(symbolInfo *define.SymbolInfo, matchID int64) *RedisModel {
+func (k *MemoryKline) CastToRedisData(symbolInfo models.Symbol, matchID int64) *RedisModel {
 	return &RedisModel{
 		Kline: Kline{
 			StartTime: k.StartTime,
 			EndTime:   k.EndTime,
-			Symbol:    symbolInfo.SymbolName,
-			SymbolID:  symbolInfo.SymbolID,
+			Symbol:    symbolInfo.Name,
+			SymbolID:  symbolInfo.Id,
 			KlineType: int32(k.KlineType),
 			Open:      k.Open.String(),
 			High:      k.High.String(),
@@ -82,19 +82,19 @@ func (k *MemoryKline) CastToRedisData(symbolInfo *define.SymbolInfo, matchID int
 	}
 }
 
-func (k *MemoryKline) CastToWsData(symbolInfo *define.SymbolInfo) commonWs.Kline {
+func (k *MemoryKline) CastToWsData(symbolInfo models.Symbol) commonWs.Kline {
 	return commonWs.Kline{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
 		KlineType: int32(k.KlineType),
-		Open:      utils.PrecCut(k.Open.String(), symbolInfo.QuoteCoinPrec.Load()),
-		High:      utils.PrecCut(k.High.String(), symbolInfo.QuoteCoinPrec.Load()),
-		Low:       utils.PrecCut(k.Low.String(), symbolInfo.QuoteCoinPrec.Load()),
-		Close:     utils.PrecCut(k.Close.String(), symbolInfo.QuoteCoinPrec.Load()),
-		Volume:    utils.PrecCut(k.Volume.String(), symbolInfo.QuoteCoinPrec.Load()),
-		Amount:    utils.PrecCut(k.Amount.String(), symbolInfo.BaseCoinPrec.Load()),
+		Open:      utils.PrecCut(k.Open.String(), symbolInfo.QuoteCoinPrec),
+		High:      utils.PrecCut(k.High.String(), symbolInfo.QuoteCoinPrec),
+		Low:       utils.PrecCut(k.Low.String(), symbolInfo.QuoteCoinPrec),
+		Close:     utils.PrecCut(k.Close.String(), symbolInfo.QuoteCoinPrec),
+		Volume:    utils.PrecCut(k.Volume.String(), symbolInfo.QuoteCoinPrec),
+		Amount:    utils.PrecCut(k.Amount.String(), symbolInfo.BaseCoinPrec),
 		Range:     k.Range,
-		Symbol:    symbolInfo.SymbolName,
+		Symbol:    symbolInfo.Name,
 	}
 }
 
