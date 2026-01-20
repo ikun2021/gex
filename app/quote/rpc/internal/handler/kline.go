@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm/clause"
 	"time"
 )
@@ -44,7 +45,7 @@ type KlineHandler struct {
 	symbolInfo      models.Symbol
 }
 
-func NewKlineHandler(svcCtx *svc.ServiceContext, symbolInfo models.Symbol) *KlineHandler {
+func NewKlineHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbolInfo models.Symbol) *KlineHandler {
 	klineHandler := &KlineHandler{
 		storeLatestKline: make(chan model.StoreKline),
 		sendChan:         make(chan model.MemoryKline),
@@ -70,19 +71,34 @@ func (kl *KlineHandler) start() {
 	go kl.store()
 	go kl.send()
 }
-func (kl *KlineHandler) Send(output *matchMq.MatchOutput_MatchResult, id pulsar.MessageID) {
-	matchData := &model.MatchData{
-		MessageID:  id,
-		MatchID:    cast.ToInt64(output.MatchResult.MatchId),
-		MatchTime:  output.MatchResult.MatchTime / 1e9,
-		Volume:     utils.NewFromString(output.MatchResult.QuoteAmount).Mul(utils.NewFromString("2")),
-		Amount:     utils.NewFromString(output.MatchResult.BaseAmount).Mul(utils.NewFromString("2")),
-		StartPrice: utils.NewFromString(output.MatchResult.BeginPrice),
-		EndPrice:   utils.NewFromString(output.MatchResult.EndPrice),
-		Low:        utils.NewFromString(output.MatchResult.LowPrice),
-		High:       utils.NewFromString(output.MatchResult.HighPrice),
+func (kl *KlineHandler) Handle(msg pulsar.Message) {
+
+	var m matchMq.MatchOutput
+	if err := proto.Unmarshal(msg.Payload(), &m); err != nil {
+		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
+		if err := kl.consumer.Ack(msg); err != nil {
+			logx.Errorw("consumer message failed", logger.ErrorField(err))
+		}
+		return
 	}
-	kl.matchData <- matchData
+
+	switch r := m.Result.(type) {
+	case *matchMq.MatchOutput_MatchResult:
+		logx.Debugw("receive match result data ", logx.Field("data", r))
+		matchData := &model.MatchData{
+			MessageID:  msg.ID(),
+			MatchID:    cast.ToInt64(r.MatchResult.MatchId),
+			MatchTime:  r.MatchResult.MatchTime / 1e9,
+			Volume:     utils.NewFromString(r.MatchResult.QuoteAmount).Mul(utils.NewFromString("2")),
+			Amount:     utils.NewFromString(r.MatchResult.BaseAmount).Mul(utils.NewFromString("2")),
+			StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
+			EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
+			Low:        utils.NewFromString(r.MatchResult.LowPrice),
+			High:       utils.NewFromString(r.MatchResult.HighPrice),
+		}
+
+		kl.matchData <- matchData
+	}
 }
 
 func (kl *KlineHandler) readInitData() {

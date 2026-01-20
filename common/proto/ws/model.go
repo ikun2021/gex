@@ -74,8 +74,8 @@ type Depth struct {
 // Tick 成交信息
 type Tick struct {
 	Price        string `json:"p"`
-	Qty          string `json:"q"`
-	Amount       string `json:"a"`
+	BaseAmount   string `json:"b"`
+	QuoteAmount  string `json:"q"`
 	TimeStamp    int64  `json:"ts"`
 	TakerIsBuyer bool   `json:"tib"`
 }

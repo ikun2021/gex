@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"github.com/apache/pulsar-client-go/pulsar"
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/enum"
+	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
 	gpush "github.com/luxun9527/gpush/proto"
@@ -14,6 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
+	"google.golang.org/protobuf/proto"
 	"sync"
 	"time"
 )
@@ -29,6 +32,7 @@ type DepthHandler struct {
 	paramChan           chan *param
 	proxyClient         ws.ProxyClient
 	symbolInfo          models.Symbol
+	consumer            pulsar.Consumer
 	currentVersion, //当前版本
 	lastVersion int64 //上一个版本
 }
@@ -40,7 +44,7 @@ type DepthData struct {
 	CurrentVersion int64
 }
 
-func NewDepthHandler(svcCtx svc.ServiceContext, symbolInfo models.Symbol) *DepthHandler {
+func NewDepthHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbolInfo models.Symbol) *DepthHandler {
 	dh := &DepthHandler{
 		asks:                rbt.NewWith(DepthComparator),
 		bids:                rbt.NewWith(DepthComparator),
@@ -51,6 +55,7 @@ func NewDepthHandler(svcCtx svc.ServiceContext, symbolInfo models.Symbol) *Depth
 		paramChan:           make(chan *param, 10),
 		ChangedPosition:     make(chan DepthData, 10),
 		symbolInfo:          symbolInfo,
+		consumer:            consumer,
 	}
 	go dh.handeUpdateDepth()
 	go dh.pushChangedPosition()
@@ -71,20 +76,20 @@ type param struct {
 	version int64
 }
 type Position struct {
-	Qty    string
-	Price  string
-	Amount string
+	BaseAmount  string
+	Price       string
+	QuoteAmount string
 }
 type position struct {
-	price decimal.Decimal
-	qty   decimal.Decimal
+	price  decimal.Decimal
+	amount decimal.Decimal
 }
 
 func (p *position) castToPosition(baseCoinPrec, quoteCoinPrec int32) *Position {
 	return &Position{
-		Qty:    p.qty.StringFixedBank(baseCoinPrec),
-		Price:  p.price.StringFixedBank(quoteCoinPrec),
-		Amount: p.price.Mul(p.qty).StringFixedBank(quoteCoinPrec),
+		BaseAmount:  p.amount.StringFixedBank(baseCoinPrec),
+		Price:       p.price.StringFixedBank(quoteCoinPrec),
+		QuoteAmount: p.price.Mul(p.amount).StringFixedBank(quoteCoinPrec),
 	}
 }
 
@@ -110,7 +115,7 @@ func (d *DepthHandler) handeUpdateDepth() {
 					value, found := d.asks.Get(par.p.price)
 					if found {
 						pos := value.(*position)
-						pos.qty = pos.qty.Add(par.p.qty)
+						pos.amount = pos.amount.Add(par.p.amount)
 						changedPosition = pos
 					} else {
 						d.asks.Put(par.p.price, par.p)
@@ -120,8 +125,8 @@ func (d *DepthHandler) handeUpdateDepth() {
 					value, found := d.asks.Get(par.p.price)
 					if found {
 						pos := value.(*position)
-						pos.qty = pos.qty.Sub(par.p.qty)
-						if pos.qty.Equal(utils.DecimalZeroMaxPrec) {
+						pos.amount = pos.amount.Sub(par.p.amount)
+						if pos.amount.Equal(utils.DecimalZeroMaxPrec) {
 							d.asks.Remove(par.p.price)
 						}
 						changedPosition = pos
@@ -133,7 +138,7 @@ func (d *DepthHandler) handeUpdateDepth() {
 					value, found := d.bids.Get(par.p.price)
 					if found {
 						pos := value.(*position)
-						pos.qty = pos.qty.Add(par.p.qty)
+						pos.amount = pos.amount.Add(par.p.amount)
 						changedPosition = pos
 					} else {
 						d.bids.Put(par.p.price, par.p)
@@ -144,8 +149,8 @@ func (d *DepthHandler) handeUpdateDepth() {
 					value, found := d.bids.Get(par.p.price)
 					if found {
 						pos := value.(*position)
-						pos.qty = pos.qty.Sub(par.p.qty)
-						if pos.qty.Equal(utils.DecimalZeroMaxPrec) {
+						pos.amount = pos.amount.Sub(par.p.amount)
+						if pos.amount.Equal(utils.DecimalZeroMaxPrec) {
 							d.bids.Remove(par.p.price)
 						}
 						changedPosition = pos
@@ -169,17 +174,17 @@ func (d *DepthHandler) handeUpdateDepth() {
 			askPositionList := make([]*Position, 0, len(d.asksChangedPosition))
 			for _, v := range d.asksChangedPosition {
 				askPositionList = append(askPositionList, &Position{
-					Qty:    v.Qty,
-					Price:  v.Price,
-					Amount: v.Amount,
+					BaseAmount:  v.BaseAmount,
+					Price:       v.Price,
+					QuoteAmount: v.QuoteAmount,
 				})
 			}
 			bidPositionList := make([]*Position, 0, len(d.bidsChangedPosition))
 			for _, v := range d.bidsChangedPosition {
 				bidPositionList = append(bidPositionList, &Position{
-					Qty:    v.Qty,
-					Price:  v.Price,
-					Amount: v.Amount,
+					BaseAmount:  v.BaseAmount,
+					Price:       v.Price,
+					QuoteAmount: v.QuoteAmount,
 				})
 			}
 
@@ -196,7 +201,33 @@ func (d *DepthHandler) handeUpdateDepth() {
 	}
 
 }
-func (d *DepthHandler) updateDepth(p *position, side enum.Side, op opType, version int64) {
+
+func (d *DepthHandler) Handle(message pulsar.Message) {
+	var m matchMq.MatchOutput
+	if err := proto.Unmarshal(message.Payload(), &m); err != nil {
+		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
+		if err := d.consumer.Ack(message); err != nil {
+			logx.Errorw("consumer message failed", logger.ErrorField(err))
+		}
+		return
+	}
+	switch t := m.Result.(type) {
+	case *matchMq.MatchOutput_AcceptedResult:
+
+		p := &position{
+			price:  utils.NewFromString(t.AcceptedResult.Price),
+			amount: utils.NewFromString(t.AcceptedResult.BaseAmount),
+		}
+		d.handle(p, t.AcceptedResult.Side, Add, 0)
+	case *matchMq.MatchOutput_CancelResult:
+		p := &position{
+			price:  utils.NewFromString(t.CancelResult.Amount),
+			amount: utils.NewFromString(t.CancelResult.Amount),
+		}
+		d.handle(p, t.CancelResult.Side, Delete, 0)
+	}
+}
+func (d *DepthHandler) handle(p *position, side enum.Side, op opType, version int64) {
 	par := &param{
 		p:       p,
 		side:    side,
@@ -244,16 +275,16 @@ func (d *DepthHandler) pushChangedPosition() {
 		for _, v := range data.Asks {
 			m := make([]string, 3)
 			m[0] = v.Price
-			m[1] = v.Qty
-			m[2] = v.Amount
+			m[1] = v.BaseAmount
+			m[2] = v.QuoteAmount
 			asks = append(asks, m)
 		}
 		bids := make([][]string, 0, len(data.Bids))
 		for _, v := range data.Bids {
 			m := make([]string, 3)
 			m[0] = v.Price
-			m[1] = v.Qty
-			m[2] = v.Amount
+			m[1] = v.BaseAmount
+			m[2] = v.QuoteAmount
 			bids = append(bids, m)
 		}
 		depth := commonWs.Depth{

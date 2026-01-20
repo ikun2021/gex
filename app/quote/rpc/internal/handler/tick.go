@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"context"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
+	"github.com/ikun2021/gex/common/models"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
+	commonWs "github.com/ikun2021/gex/common/proto/ws"
+	gpush "github.com/luxun9527/gpush/proto"
 	logger "github.com/luxun9527/zlog"
 	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -22,29 +26,41 @@ type TickHandle struct {
 	ticker       *time.Ticker
 	batchData    []*matchMq.MatchResult
 	svcCtx       *svc.ServiceContext
-	msgChan      chan TickMsg
+	msgChan      chan *matchMq.MatchResult
 	currentMsgId pulsar.MessageID
+	sendChan     chan *matchMq.MatchResult
+	symbolInfo   models.Symbol
 }
 
-type TickMsg struct {
-	Message pulsar.Message
-	MsgId   pulsar.MessageID
-}
-
-func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer) TickHandle {
+func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol models.Symbol) TickHandle {
 	ticker := time.NewTicker(time.Second * 2)
-	c := make(chan TickMsg, 10)
+	c := make(chan *matchMq.MatchResult, 10)
 	t := TickHandle{
-		consumer: consumer,
-		ticker:   ticker,
-		svcCtx:   svcCtx,
-		msgChan:  c,
+		consumer:   consumer,
+		ticker:     ticker,
+		svcCtx:     svcCtx,
+		msgChan:    c,
+		symbolInfo: symbol,
+		sendChan:   make(chan *matchMq.MatchResult, 10),
 	}
-	t.start()
+	go t.start()
+	go t.send()
 	return t
 }
-func (t *TickHandle) Send(message TickMsg) {
-	t.msgChan <- message
+func (t *TickHandle) Handle(message pulsar.Message) {
+	var m matchMq.MatchOutput
+	if err := proto.Unmarshal(message.Payload(), &m); err != nil {
+		logx.Errorw("unmarshal failed", logger.ErrorField(err))
+		return
+	}
+
+	switch r := m.Result.(type) {
+	case *matchMq.MatchOutput_MatchResult:
+		t.msgChan <- r.MatchResult
+		t.sendChan <- r.MatchResult
+		t.currentMsgId = message.ID()
+	}
+
 }
 
 func (t *TickHandle) commitBatch() {
@@ -63,7 +79,30 @@ func (t *TickHandle) commitBatch() {
 
 	logx.Info("batch commit success")
 }
+func (kl *TickHandle) send() {
+	for data := range kl.sendChan {
+		for _, v := range data.MatchedRecord {
+			d := commonWs.Tick{
+				Price:        v.Price,
+				BaseAmount:   v.BaseAmount,
+				QuoteAmount:  v.QuoteAmount,
+				TimeStamp:    data.MatchTime,
+				TakerIsBuyer: data.TakerIsBuy,
+			}
+			msg := commonWs.Message[commonWs.Tick]{
+				Topic:   commonWs.TickPrefix.WithParam(kl.symbolInfo.Name),
+				Payload: d,
+			}
+			if _, err := kl.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
+				Topic: commonWs.TickPrefix.WithParam(kl.symbolInfo.Name),
+				Data:  msg.ToBytes(),
+			}); err != nil {
+				logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
+			}
+		}
 
+	}
+}
 func (t TickHandle) start() {
 	// 5. 主循环 (现在是真正的非阻塞 Select)
 	for {
@@ -75,20 +114,12 @@ func (t TickHandle) start() {
 			}
 
 		// 情况 B: 收到新消息 -> 放入缓冲区
-		case message := <-t.msgChan:
-			var m matchMq.MatchOutput
-			if err := proto.Unmarshal(message.Message.Payload(), &m); err != nil {
-				logx.Errorw("unmarshal failed", logger.ErrorField(err))
-				continue
-			}
+		case matchResult := <-t.msgChan:
 
-			switch r := m.Result.(type) {
-			case *matchMq.MatchOutput_MatchResult:
-				t.batchData = append(t.batchData, r.MatchResult)
-			}
+			t.batchData = append(t.batchData, matchResult)
 
 			// 数量够了 -> 提交
-			if len(t.batchData) >= 50 {
+			if len(t.batchData) >= 10 {
 				t.commitBatch()
 				// 重置定时器，防止刚提交完马上又触发定时任务，浪费资源
 				t.ticker.Reset(2 * time.Second)

@@ -153,6 +153,10 @@ message CancelResult{
   int32 coin_id = 2;
   //数量
   string amount = 3;
+  //价格
+  string price = 5;
   //用户id
   int64 uid = 4;
+  //方向
+  commonEnum.Side side = 6;
 }

@@ -22,6 +22,7 @@ import (
 func InitConsumer(sc *svc.ServiceContext) {
 
 	for _, v := range sc.Config.Symbol {
+		//tick
 		go func(s models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
@@ -32,14 +33,14 @@ func InitConsumer(sc *svc.ServiceContext) {
 				logx.Severef("init consumer failed %v", err)
 			}
 			// 1. 定义缓冲区 (在循环外)
-			tickHandle := handler.NewTickHandle(sc, consumer)
+			tickHandle := handler.NewTickHandle(sc, consumer, v)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
 					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
 					continue
 				}
-				tickHandle.Send(message)
+				tickHandle.Handle(message)
 
 			}
 		}(v)
@@ -88,49 +89,30 @@ func InitConsumer(sc *svc.ServiceContext) {
 			}
 		}(v)
 
+		//kline
 		go func(s models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
 				SubscriptionName: config.Kline,
-				Type:             pulsar.Shared,
+				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
 				logx.Severef("init consumer failed %v", err)
 			}
+			klineHandler := handler.NewKlineHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
 					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
 					continue
 				}
-				var m matchMq.MatchOutput
-				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
-					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
-					if err := consumer.Ack(message); err != nil {
-						logx.Errorw("consumer message failed", logger.ErrorField(err))
-					}
-					continue
-				}
-				switch r := m.Result.(type) {
-				case *matchMq.MatchOutput_MatchResult:
-					logx.Debugw("receive match result data ", logx.Field("data", r))
-					matchData := &model.MatchData{
-						MessageID:  message.ID(),
-						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
-						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromString(r.MatchResult.Amount).Mul(utils.NewFromString("2")),
-						Amount:     utils.NewFromString(r.MatchResult.Qty).Mul(utils.NewFromString("2")),
-						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
-						Low:        utils.NewFromString(r.MatchResult.LowPrice),
-						High:       utils.NewFromString(r.MatchResult.HighPrice),
-					}
-					md <- matchData
-				}
 
+				klineHandler.Handle(message)
 			}
+
 		}(v)
 
+		//depth
 		go func(s models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
@@ -140,40 +122,16 @@ func InitConsumer(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init consumer failed %v", err)
 			}
+			depthHandler := handler.NewDepthHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
 					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
 					continue
 				}
-				var m matchMq.MatchOutput
-				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
-					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
-					if err := consumer.Ack(message); err != nil {
-						logx.Errorw("consumer message failed", logger.ErrorField(err))
-					}
-					continue
-				}
-				switch r := m.Result.(type) {
-				case *matchMq.MatchOutput_MatchResult:
-					logx.Debugw("receive match result data ", logx.Field("data", r))
-					matchData := &model.MatchData{
-						MessageID:  message.ID(),
-						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
-						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromString(r.MatchResult.QuoteAmount).Mul(utils.NewFromString("2")),
-						Amount:     utils.NewFromString(r.MatchResult.BaseAmount).Mul(utils.NewFromString("2")),
-						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
-						Low:        utils.NewFromString(r.MatchResult.LowPrice),
-						High:       utils.NewFromString(r.MatchResult.HighPrice),
-					}
-					md <- matchData
-				}
-
+				depthHandler.Handle(message)
 			}
 		}(v)
 	}
 
-	return md
 }
