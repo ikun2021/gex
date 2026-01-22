@@ -33,7 +33,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init pulsar producer failed %v", err)
 			}
-			me := engine.NewMatchEngine(symbol, sc.Config, producer)
+			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient)
 
 			for {
 				message, err := consumer.Receive(ctx)
@@ -41,18 +41,28 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 					logx.Errorw("receive message fail", logger.ErrorField(err))
 					continue
 				}
+				//message.ID().String()
 				var matchReq matchMq.MatchInput
 				if err := proto.Unmarshal(message.Payload(), &matchReq); err != nil {
 					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
 					continue
 				}
+
+				if me.Gte(matchReq.MessageId) {
+					logx.Slowf("current msg id %v", matchReq.MessageId)
+					continue
+				}
+				
 				logx.Infow("receive message failed", logx.Field("data", &matchReq))
+				var order *engine.Order
 				switch event := matchReq.Event.(type) {
 				case *matchMq.MatchInput_CreateOrder:
-					order := &engine.Order{
+					order = &engine.Order{
+						MessageId:           matchReq.MessageId,
+						PulsarMsgId:         message.ID(),
 						Uid:                 event.CreateOrder.Uid,
 						OrderID:             event.CreateOrder.OrderId,
-						SequenceId:          event.CreateOrder.SequenceId,
+						OrderPkId:           event.CreateOrder.SequenceId,
 						CreateTime:          0,
 						IsCancel:            false,
 						Price:               utils.NewFromString(event.CreateOrder.Price),
@@ -66,23 +76,21 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 						UnfilledQuoteAmount: utils.NewFromString(event.CreateOrder.QuoteAmount),
 						FilledQuoteAmount:   utils.DecimalZeroMaxPrec,
 					}
-					me.HandleOrder(order)
+
 				case *matchMq.MatchInput_CancelOrder:
-					order := &engine.Order{
-						OrderID:    "",
-						SequenceId: event.CancelOrder.Id,
-						CreateTime: 0,
-						IsCancel:   true,
-						Side:       event.CancelOrder.Side,
-						Uid:        0,
-						OrderType:  event.CancelOrder.OrderType,
-						Price:      utils.NewFromString(event.CancelOrder.Price),
+					order = &engine.Order{
+						MessageId:   matchReq.MessageId,
+						PulsarMsgId: message.ID(),
+						OrderPkId:   event.CancelOrder.Id,
+						IsCancel:    true,
+						Side:        event.CancelOrder.Side,
+						OrderType:   event.CancelOrder.OrderType,
+						Price:       utils.NewFromString(event.CancelOrder.Price),
 					}
-					me.HandleOrder(order)
+
 				}
-				if err := consumer.Ack(message); err != nil {
-					logx.Errorw("consumer message failed", logger.ErrorField(err))
-				}
+
+				me.HandleOrder(order)
 			}
 		}(v)
 	}

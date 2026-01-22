@@ -8,6 +8,7 @@ message MatchInput{
     CreateOrderEvent create_order = 1;
     CancelOrderEvent cancel_order = 2;
   }
+  int64 message_id = 3;
 }
 
 
@@ -17,7 +18,7 @@ message MatchOutput{
     CancelResult cancel_result = 2;
     AcceptedResult accepted_result = 3;
   }
-  string message_id = 4;
+  int64 message_id = 4;
 }
 
 //下单操作

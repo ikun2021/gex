@@ -8,16 +8,21 @@ import (
 	"github.com/ikun2021/gex/common/pkg/etcd"
 	"github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/proto/enum"
+	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/stringx"
 	"reflect"
-	"time"
-
 	"testing"
+	"time"
 )
 
 func TestMatch(t *testing.T) {
+	// Create a Redis client with a mock address for testing
+	mockRedisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379", // Will not connect in tests
+	})
+
 	var me = NewMatchEngine(models.Symbol{
 		Name:        "USDT_BTC",
 		BaseCoinId:  2,
@@ -38,7 +43,7 @@ func TestMatch(t *testing.T) {
 			Precision: 6,
 		}},
 		EtcdRegisterConf: etcd.EtcdRegisterConf{},
-	}, nil)
+	}, nil, mockRedisClient)
 
 	// ApplyMethod 参数：
 	// 1. reflect.TypeOf(receiver): 获取接收者的类型（如果是指针接收者，需要传指针）
@@ -51,7 +56,7 @@ func TestMatch(t *testing.T) {
 	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
 	me.HandleOrder(&Order{
 		OrderID:             stringx.Rand(),
-		SequenceId:          1,
+		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
 		IsCancel:            false,
 		Uid:                 1,
@@ -68,7 +73,7 @@ func TestMatch(t *testing.T) {
 	})
 	me.HandleOrder(&Order{
 		OrderID:             stringx.Rand(),
-		SequenceId:          1,
+		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
 		IsCancel:            false,
 		Uid:                 1,
@@ -87,6 +92,11 @@ func TestMatch(t *testing.T) {
 
 }
 func TestMatchCancel(t *testing.T) {
+	// Create a Redis client with a mock address for testing
+	mockRedisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379", // Will not connect in tests
+	})
+
 	var me = NewMatchEngine(models.Symbol{
 		Name:        "USDT_BTC",
 		BaseCoinId:  2,
@@ -107,7 +117,7 @@ func TestMatchCancel(t *testing.T) {
 			Precision: 6,
 		}},
 		EtcdRegisterConf: etcd.EtcdRegisterConf{},
-	}, nil)
+	}, nil, mockRedisClient)
 
 	patches := gomonkey.ApplyMethod(reflect.TypeOf(me), "SendResult", func(_ *MatchEngine, matchMsg *MatchOutputMessage) {
 		matchMsg.Dump()
@@ -116,7 +126,7 @@ func TestMatchCancel(t *testing.T) {
 	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
 	me.HandleOrder(&Order{
 		OrderID:             stringx.Rand(),
-		SequenceId:          1,
+		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
 		IsCancel:            false,
 		Uid:                 1,
@@ -133,7 +143,7 @@ func TestMatchCancel(t *testing.T) {
 	})
 	me.HandleOrder(&Order{
 		OrderID:             stringx.Rand(),
-		SequenceId:          2,
+		OrderPkId:           2,
 		CreateTime:          time.Now().UnixNano(),
 		IsCancel:            false,
 		Uid:                 1,

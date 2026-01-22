@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"github.com/apache/pulsar-client-go/pulsar"
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	enum "github.com/ikun2021/gex/common/proto/enum"
 	"github.com/shopspring/decimal"
@@ -18,7 +19,23 @@ type OrderBook struct {
 	side      enum.Side
 }
 
+func (ob *OrderBook) Copy() *OrderBook {
+	newOrderBook := NewOrderBook(ob.side)
+
+	// 复制所有订单
+	values := ob.orderBook.Values()
+	for _, value := range values {
+		order := value.(*Order)
+		// 创建新的订单副本
+		newOrder := *order // 复制订单结构体
+		newOrderBook.add(&newOrder)
+	}
+
+	return newOrderBook
+}
+
 func (ob *OrderBook) dump() {
+	pulsar.DeserializeMessageID()
 	sideStr := "买盘 (BIDS)"
 	if ob.side == enum.Side_Sell {
 		sideStr = "卖盘 (ASKS)"
@@ -91,7 +108,7 @@ func NewOrderBook(side enum.Side) *OrderBook {
 func (ob *OrderBook) add(order *Order) {
 	k := &Key{
 		price: order.Price,
-		id:    order.SequenceId,
+		id:    order.OrderPkId,
 	}
 	//加入到订单簿中
 	ob.orderBook.Put(k, order)
@@ -100,7 +117,7 @@ func (ob *OrderBook) add(order *Order) {
 func (ob *OrderBook) remove(order *Order) {
 	k := &Key{
 		price: order.Price,
-		id:    order.SequenceId,
+		id:    order.OrderPkId,
 	}
 	ob.orderBook.Remove(k)
 }

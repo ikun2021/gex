@@ -3,12 +3,15 @@ package svc
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/config"
+	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 type ServiceContext struct {
 	Config       config.Config
 	PulsarClient pulsar.Client
+	RedisClient  *redis.Redis
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -16,9 +19,13 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		logx.Severef("init pulsar client failed %v", err)
 	}
+	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
+
+	redisClient := redis.MustNewRedis(c.RedisConf)
 
 	return &ServiceContext{
 		Config:       c,
 		PulsarClient: client,
+		RedisClient:  redisClient,
 	}
 }

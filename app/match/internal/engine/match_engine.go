@@ -2,7 +2,10 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/config"
 	"github.com/ikun2021/gex/common/defines"
@@ -16,25 +19,35 @@ import (
 	"github.com/spf13/cast"
 	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stringx"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 // MatchEngine 撮合引擎
 type MatchEngine struct {
-	asks               *OrderBook      //卖盘
-	bids               *OrderBook      //买盘
-	bestBid            decimal.Decimal //买一价
-	bestAsk            decimal.Decimal //卖一价
-	symbolConf         models.Symbol
-	producer           pulsar.Producer
-	proxyClient        ws.ProxyClient
-	currentSeqId       int64
-	quoteCoinPrecision int32
-	baseCoinPrecision  int32
+	asks                   *OrderBook      //卖盘
+	bids                   *OrderBook      //买盘
+	bestBid                decimal.Decimal //买一价
+	bestAsk                decimal.Decimal //卖一价
+	symbolConf             models.Symbol
+	producer               pulsar.Producer
+	proxyClient            ws.ProxyClient
+	currentMsgId           int64
+	quoteCoinPrecision     int32
+	baseCoinPrecision      int32
+	redisClient            *redis.Redis
+	input                  chan *Order
+	storeChan              chan *SnapshotData
+	version                int64
+	currentPulsarMessageId pulsar.MessageID
 }
 
+func (m *MatchEngine) UpdateCurrentMsgId(msgId int64) {
+	m.currentMsgId = msgId
+}
+func (m *MatchEngine) Gte(msgId int64) bool {
+	return m.currentMsgId > msgId || m.currentMsgId == msgId
+}
 func (m *MatchEngine) dump() {
 	fmt.Printf("⚙️  ----------------------------------------------撮合引擎详情 (Match Engine)-----------------------------------:\n")
 	fmt.Printf("🪙 交易对: %s (ID: %d)\n", m.symbolConf.Name, m.symbolConf.Id)
@@ -42,7 +55,6 @@ func (m *MatchEngine) dump() {
 	fmt.Printf("🪙 计价币ID: %d\n", m.symbolConf.QuoteCoinId)
 	fmt.Printf("📏 基础币精度: %d\n", m.baseCoinPrecision)
 	fmt.Printf("📏 计价币精度: %d\n", m.quoteCoinPrecision)
-	fmt.Printf("🔢 当前序列ID: %d\n", m.currentSeqId)
 	fmt.Printf("📈 最佳买价 (买一价): %s\n", m.bestBid.String())
 	fmt.Printf("📉 最佳卖价 (卖一价): %s\n", m.bestAsk.String())
 	fmt.Println("🛒 卖盘 (ASKS):")
@@ -225,7 +237,7 @@ type AcceptedResp struct {
 	Uid int64
 }
 
-func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer) *MatchEngine {
+func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer, redisClient *redis.Redis) *MatchEngine {
 	me := &MatchEngine{
 		asks:               NewOrderBook(enum.Side_Sell),
 		bids:               NewOrderBook(enum.Side_Buy),
@@ -235,7 +247,11 @@ func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Produce
 		producer:           producer,
 		quoteCoinPrecision: conf.Coin[c.QuoteCoinId-1].Precision,
 		baseCoinPrecision:  conf.Coin[c.BaseCoinId-1].Precision,
+		redisClient:        redisClient,
+		input:              make(chan *Order, 1000),
+		storeChan:          make(chan *SnapshotData, 1000),
 	}
+	me.recover()
 	return me
 }
 
@@ -290,7 +306,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 	//如果没有买盘，直接取消订单
 	if m.bids.orderBook.Size() == 0 {
 		matchMsg.CancelResult = &CancelResult{
-			CancelId: takerOrder.SequenceId,
+			CancelId: takerOrder.OrderPkId,
 			CoinId:   m.symbolConf.BaseCoinId,
 			Amount:   takerOrder.UnfilledBaseAmount.String(),
 			Uid:      takerOrder.Uid,
@@ -401,7 +417,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
 		r := &MatchOutputMessage{
 			CancelResult: &CancelResult{
-				CancelId: takerOrder.SequenceId,
+				CancelId: takerOrder.OrderPkId,
 				CoinId:   m.symbolConf.BaseCoinId,
 				Amount:   takerOrder.UnfilledBaseAmount.String(),
 				Uid:      takerOrder.Uid,
@@ -427,7 +443,7 @@ func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *Order) {
 	//如果没有卖盘，直接取消订单
 	if m.asks.orderBook.Size() == 0 {
 		matchMsg.CancelResult = &CancelResult{
-			CancelId: takerOrder.SequenceId,
+			CancelId: takerOrder.OrderPkId,
 			CoinId:   m.symbolConf.QuoteCoinId,
 			Amount:   takerOrder.UnfilledQuoteAmount.String(),
 			Uid:      takerOrder.Uid,
@@ -542,7 +558,7 @@ LOOP:
 
 	if takerOrder.OrderStatus != enum.OrderStatus_ALLFilled {
 		r := &MatchOutputMessage{CancelResult: &CancelResult{
-			CancelId: takerOrder.SequenceId,
+			CancelId: takerOrder.OrderPkId,
 			CoinId:   m.symbolConf.QuoteCoinId,
 			Amount:   takerOrder.UnfilledQuoteAmount.String(),
 			Uid:      takerOrder.Uid,
@@ -791,17 +807,95 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 	m.SendResult(matchMessage)
 
 }
-func (m *MatchEngine) HandleOrder(order *Order) {
 
-	//从接收输入的第一个订单开始，以后每次操作版本号加一
-	if m.currentSeqId != 0 {
-		m.currentSeqId = order.SequenceId
-	} else {
-		m.currentSeqId++
+func (m *MatchEngine) start() {
+	ticker := time.NewTicker(time.Minute)
+	isUpdated := false
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if isUpdated {
+					//执行持久化
+					m.snapshot()
+					isUpdated = false
+				}
+			case order := <-m.input:
+				m.version++
+				m.currentPulsarMessageId = order.PulsarMsgId
+				isUpdated = true
+				if m.version%2000 == 0 {
+					m.snapshot()
+				}
+				m.handle(order)
+			}
+		}
+	}()
+}
+func (m *MatchEngine) HandleOrder(order *Order) {
+	m.input <- order
+}
+func (m *MatchEngine) store() {}
+func (m *MatchEngine) snapshot() {
+	//持久化
+	data := &SnapshotData{
+		Asks:         make([]*Order, 0, m.asks.orderBook.Size()),
+		Bids:         make([]*Order, 0, m.bids.orderBook.Size()),
+		CurrentMsgId: m.currentMsgId,
+		PulsarMsgID:  m.currentPulsarMessageId,
 	}
+	for _, v := range m.asks.orderBook.Values() {
+		data.Asks = append(data.Asks, v.(*Order))
+	}
+	for _, v := range m.bids.orderBook.Values() {
+		data.Bids = append(data.Bids, v.(*Order))
+	}
+
+	b, _ := json.Marshal(data)
+	key := fmt.Sprintf("match_engine_snapshot:%d", m.symbolConf.Id)
+	if err := m.redisClient.Set(key, string(b)); err != nil {
+		logx.Errorf("match engine snapshot failed symbol=%v err=%v", m.symbolConf.Name, err)
+	} else {
+		logx.Infof("match engine snapshot success symbol=%v msgId=%v", m.symbolConf.Name, m.currentMsgId)
+	}
+}
+
+type SnapshotData struct {
+	Asks         []*Order         `json:"asks"`
+	Bids         []*Order         `json:"bids"`
+	CurrentMsgId int64            `json:"current_msg_id"`
+	PulsarMsgID  pulsar.MessageID `json:"pulsar_msg_id"`
+}
+
+func (m *MatchEngine) recover() {
+	key := fmt.Sprintf("match_engine_snapshot:%d", m.symbolConf.Id)
+	val, err := m.redisClient.Get(key)
+	if err != nil || val == "" {
+		return
+	}
+	var data SnapshotData
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		logx.Errorf("match engine recover unmarshal failed symbol=%v err=%v", m.symbolConf.Name, err)
+		return
+	}
+	for _, v := range data.Asks {
+		m.asks.add(v)
+	}
+	for _, v := range data.Bids {
+		m.bids.add(v)
+	}
+	m.currentMsgId = data.CurrentMsgId
+	m.updateBestAsk()
+	m.updateBestBid()
+	logx.Infof("match engine recover success symbol=%v msgId=%v asks=%d bids=%d", m.symbolConf.Name, m.currentMsgId, len(data.Asks), len(data.Bids))
+}
+
+func (m *MatchEngine) handle(order *Order) {
+	m.currentMsgId = order.MessageId
+
 	k := &Key{
 		price: order.Price,
-		id:    order.SequenceId,
+		id:    order.OrderPkId,
 	}
 	var o interface{}
 	var found bool
@@ -837,7 +931,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 		}
 		m.SendResult(&MatchOutputMessage{
 			CancelResult: &CancelResult{
-				CancelId: order.SequenceId,
+				CancelId: order.OrderPkId,
 				CoinId:   coinId,
 				Amount:   qty,
 				Uid:      orderDetail.Uid,
@@ -908,7 +1002,7 @@ func (m *MatchEngine) HandleOrder(order *Order) {
 func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 
 	var resp matchMq.MatchOutput
-	resp.MessageId = stringx.Rand()
+	resp.MessageId = idgen.NextId()
 	switch matchMsg.MsgType {
 	case MsgTypeMatchResult:
 		matchResult := matchMsg.MatchResult
@@ -949,7 +1043,7 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 					UnFilledQuoteAmount: record.Taker.UnfilledQuoteAmount.String(),
 					OrderStatus:         record.Taker.OrderStatus,
 					Uid:                 record.Taker.Uid,
-					Id:                  record.Taker.SequenceId,
+					Id:                  record.Taker.OrderPkId,
 					UnFrozenAmount:      takerUnFrozenAmount.String(),
 				},
 				Maker: &matchMq.OrderResp{
@@ -960,7 +1054,7 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 					OrderStatus:         record.Maker.OrderStatus,
 					UnFilledQuoteAmount: record.Maker.UnfilledQuoteAmount.String(),
 					Uid:                 record.Maker.Uid,
-					Id:                  record.Maker.SequenceId,
+					Id:                  record.Maker.OrderPkId,
 				},
 			}
 			records = append(records, r)
@@ -975,8 +1069,8 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 			BeginPrice:    beginPrice,
 			EndPrice:      endPrice,
 			MatchTime:     matchResult.MatchTime,
-			Qty:           totalQty.String(),
-			Amount:        totalAmount.String(),
+			BaseAmount:    totalQty.String(),
+			QuoteAmount:   totalAmount.String(),
 			HighPrice:     highPrice,
 			LowPrice:      lowPrice,
 			TakerIsBuy:    matchResult.TakerIsBuy,
