@@ -36,15 +36,12 @@ type MatchEngine struct {
 	quoteCoinPrecision     int32
 	baseCoinPrecision      int32
 	redisClient            *redis.Redis
-	input                  chan *Order
+	input                  chan *InputMessage
 	storeChan              chan *SnapshotData
 	version                int64
 	currentPulsarMessageId pulsar.MessageID
 }
 
-func (m *MatchEngine) UpdateCurrentMsgId(msgId int64) {
-	m.currentMsgId = msgId
-}
 func (m *MatchEngine) Gte(msgId int64) bool {
 	return m.currentMsgId > msgId || m.currentMsgId == msgId
 }
@@ -78,9 +75,9 @@ type MatchedRecord struct {
 	Amount          decimal.Decimal
 	MatchedRecordID string
 	//最新的taker订单的状态
-	Taker Order
+	Taker InputMessage
 	//最新的maker订单的状态
-	Maker Order
+	Maker InputMessage
 }
 type MatchResult struct {
 	//每一次匹配的结构
@@ -249,14 +246,14 @@ func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Produce
 		quoteCoinPrecision: conf.Coin[c.QuoteCoinId-1].Precision,
 		baseCoinPrecision:  conf.Coin[c.BaseCoinId-1].Precision,
 		redisClient:        redisClient,
-		input:              make(chan *Order, 1000),
+		input:              make(chan *InputMessage, 1000),
 		storeChan:          make(chan *SnapshotData, 1000),
 	}
 	me.recover()
 	return me
 }
 
-func (m *MatchEngine) addOrder(order *Order) {
+func (m *MatchEngine) addOrder(order *InputMessage) {
 	if order.Side == enum.Side_Buy {
 		m.bids.add(order)
 		m.updateBestBid()
@@ -266,7 +263,7 @@ func (m *MatchEngine) addOrder(order *Order) {
 	}
 
 }
-func (m *MatchEngine) cancelOrder(order *Order) {
+func (m *MatchEngine) cancelOrder(order *InputMessage) {
 	if order.Side == enum.Side_Buy {
 		m.bids.remove(order)
 		m.updateBestBid()
@@ -295,7 +292,7 @@ func (m *MatchEngine) updateBestAsk() {
 }
 
 // 匹配市价单卖单
-func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
+func (m *MatchEngine) matchMarketOrderSell(takerOrder *InputMessage) {
 
 	matchMsg := &MatchOutputMessage{
 		MatchResult: &MatchResult{
@@ -321,7 +318,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 	var matchedRecord *MatchedRecord
 	deletedKeys := make([]*Key, 0, 2)
 	for iterator.Next() {
-		makerOrder := iterator.Value().(*Order)
+		makerOrder := iterator.Value().(*InputMessage)
 		result := takerOrder.UnfilledBaseAmount.Cmp(makerOrder.UnfilledBaseAmount)
 		switch result {
 		case defines.Gt:
@@ -432,7 +429,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *Order) {
 }
 
 // 市价买单 按照指定计价币的数量来买
-func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *Order) {
+func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *InputMessage) {
 
 	matchMsg := &MatchOutputMessage{
 		MatchResult: &MatchResult{
@@ -460,7 +457,7 @@ func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *Order) {
 	var matchedRecord *MatchedRecord
 LOOP:
 	for iterator.Next() {
-		makerOrder := iterator.Value().(*Order)
+		makerOrder := iterator.Value().(*InputMessage)
 		result := takerOrder.UnfilledQuoteAmount.Cmp(makerOrder.UnfilledQuoteAmount)
 		switch result {
 		case defines.Gt:
@@ -571,7 +568,7 @@ LOOP:
 }
 
 // 匹配限价买单
-func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
+func (m *MatchEngine) matchLimitOrderBuy(takerOrder *InputMessage) {
 	matchMsg := &MatchOutputMessage{
 		MatchResult: &MatchResult{
 			MatchedRecords: make([]*MatchedRecord, 0, 2),
@@ -584,7 +581,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 	//待被删除的key
 	deletedKeys := make([]*Key, 0, 2)
 	for iterator.Next() {
-		makerOrder := iterator.Value().(*Order)
+		makerOrder := iterator.Value().(*InputMessage)
 
 		//订单全部成交退出，或者小于下一个订单的价格。不再循环匹配。
 		if takerOrder.OrderStatus == enum.OrderStatus_ALLFilled || makerOrder.Price.GreaterThan(takerOrder.Price) {
@@ -691,7 +688,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *Order) {
 }
 
 // 匹配限价卖单
-func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
+func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 	matchMessage := &MatchOutputMessage{
 		MatchResult: &MatchResult{
 			MatchedRecords: make([]*MatchedRecord, 0, 2),
@@ -704,7 +701,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *Order) {
 	var matchedRecord *MatchedRecord
 	deletedKeys := make([]*Key, 0, 2)
 	for iterator.Next() {
-		makerOrder := iterator.Value().(*Order)
+		makerOrder := iterator.Value().(*InputMessage)
 		//订单全部成交退出，或者小于下一个订单的价格。不再循环匹配。
 		if takerOrder.OrderStatus == enum.OrderStatus_ALLFilled || takerOrder.Price.GreaterThan(makerOrder.Price) {
 			break
@@ -835,7 +832,7 @@ func (m *MatchEngine) start() {
 		}
 	}()
 }
-func (m *MatchEngine) HandleOrder(order *Order) {
+func (m *MatchEngine) HandleOrder(order *InputMessage) {
 	m.input <- order
 }
 
@@ -853,24 +850,24 @@ func (m *MatchEngine) store() {
 func (m *MatchEngine) snapshot() {
 	//持久化
 	data := &SnapshotData{
-		Asks:         make([]*Order, 0, m.asks.orderBook.Size()),
-		Bids:         make([]*Order, 0, m.bids.orderBook.Size()),
+		Asks:         make([]*InputMessage, 0, m.asks.orderBook.Size()),
+		Bids:         make([]*InputMessage, 0, m.bids.orderBook.Size()),
 		CurrentMsgId: m.currentMsgId,
 		PulsarMsgID:  m.currentPulsarMessageId,
 	}
 	for _, v := range m.asks.orderBook.Values() {
-		data.Asks = append(data.Asks, v.(*Order))
+		data.Asks = append(data.Asks, v.(*InputMessage))
 	}
 	for _, v := range m.bids.orderBook.Values() {
-		data.Bids = append(data.Bids, v.(*Order))
+		data.Bids = append(data.Bids, v.(*InputMessage))
 	}
 
 	m.storeChan <- data
 }
 
 type SnapshotData struct {
-	Asks         []*Order         `json:"asks"`
-	Bids         []*Order         `json:"bids"`
+	Asks         []*InputMessage  `json:"asks"`
+	Bids         []*InputMessage  `json:"bids"`
 	CurrentMsgId int64            `json:"current_msg_id"`
 	PulsarMsgID  pulsar.MessageID `json:"pulsar_msg_id"`
 }
@@ -899,7 +896,7 @@ func (m *MatchEngine) recover() {
 	logx.Infof("match engine recover success symbol=%v msgId=%v asks=%d bids=%d", m.symbolConf.Name, m.currentMsgId, len(data.Asks), len(data.Bids))
 }
 
-func (m *MatchEngine) handle(order *Order) {
+func (m *MatchEngine) handle(order *InputMessage) {
 
 	k := &Key{
 		price: order.Price,
@@ -922,7 +919,7 @@ func (m *MatchEngine) handle(order *Order) {
 	}
 
 	if order.IsCancel {
-		orderDetail := o.(*Order)
+		orderDetail := o.(*InputMessage)
 		order.UnfilledBaseAmount = orderDetail.UnfilledBaseAmount
 		order.UnfilledQuoteAmount = orderDetail.UnfilledQuoteAmount
 		order.QuoteAmount = orderDetail.QuoteAmount

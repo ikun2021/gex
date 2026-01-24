@@ -52,12 +52,12 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 					logx.Slowf("current msg id %v", matchReq.MessageId)
 					continue
 				}
-				
+
 				logx.Infow("receive message failed", logx.Field("data", &matchReq))
-				var order *engine.Order
+				var inputMessage *engine.InputMessage
 				switch event := matchReq.Event.(type) {
 				case *matchMq.MatchInput_CreateOrder:
-					order = &engine.Order{
+					inputMessage = &engine.InputMessage{
 						MessageId:           matchReq.MessageId,
 						PulsarMsgId:         message.ID(),
 						Uid:                 event.CreateOrder.Uid,
@@ -78,7 +78,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 					}
 
 				case *matchMq.MatchInput_CancelOrder:
-					order = &engine.Order{
+					inputMessage = &engine.InputMessage{
 						MessageId:   matchReq.MessageId,
 						PulsarMsgId: message.ID(),
 						OrderPkId:   event.CancelOrder.Id,
@@ -90,7 +90,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 
 				}
 
-				me.HandleOrder(order)
+				me.HandleOrder(inputMessage)
 			}
 		}(v)
 	}

@@ -54,7 +54,7 @@ func TestMatch(t *testing.T) {
 	})
 	defer patches.Reset()
 	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
-	me.HandleOrder(&Order{
+	me.HandleOrder(&InputMessage{
 		OrderID:             stringx.Rand(),
 		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
@@ -71,7 +71,7 @@ func TestMatch(t *testing.T) {
 		UnfilledQuoteAmount: decimal.New(1, 1),
 		FilledQuoteAmount:   decimal.Decimal{},
 	})
-	me.HandleOrder(&Order{
+	me.HandleOrder(&InputMessage{
 		OrderID:             stringx.Rand(),
 		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
@@ -124,7 +124,7 @@ func TestMatchCancel(t *testing.T) {
 	})
 	defer patches.Reset()
 	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(1))
-	me.HandleOrder(&Order{
+	me.HandleOrder(&InputMessage{
 		OrderID:             stringx.Rand(),
 		OrderPkId:           1,
 		CreateTime:          time.Now().UnixNano(),
@@ -141,7 +141,7 @@ func TestMatchCancel(t *testing.T) {
 		UnfilledQuoteAmount: decimal.New(1, 1),
 		FilledQuoteAmount:   decimal.Decimal{},
 	})
-	me.HandleOrder(&Order{
+	me.HandleOrder(&InputMessage{
 		OrderID:             stringx.Rand(),
 		OrderPkId:           2,
 		CreateTime:          time.Now().UnixNano(),

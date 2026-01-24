@@ -221,12 +221,24 @@ func (d *DepthHandler) Handle(message pulsar.Message) {
 		d.handle(p, t.AcceptedResult.Side, Add, 0)
 	case *matchMq.MatchOutput_CancelResult:
 		p := &position{
-			price:  utils.NewFromString(t.CancelResult.Amount),
+			price:  utils.NewFromString(t.CancelResult.Price),
 			amount: utils.NewFromString(t.CancelResult.Amount),
 		}
 		d.handle(p, t.CancelResult.Side, Delete, 0)
 	case *matchMq.MatchOutput_MatchResult:
-		
+		for _, v := range t.MatchResult.MatchedRecord {
+			p := &position{
+				price:  utils.NewFromString(v.Price),
+				amount: utils.NewFromString(v.BaseAmount),
+			}
+			side := enum.Side_Buy
+			//taker 是买单，则删除买盘的订单。
+			if t.MatchResult.TakerIsBuy {
+				side = enum.Side_Sell
+			}
+
+			d.handle(p, side, Delete, 0)
+		}
 	}
 }
 func (d *DepthHandler) handle(p *position, side enum.Side, op opType, version int64) {

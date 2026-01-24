@@ -6,8 +6,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Order 订单
-type Order struct {
+// InputMessage
+type InputMessage struct {
 	MessageId           int64            `json:"message_id"`
 	PulsarMsgId         pulsar.MessageID `json:"-"`
 	OrderID             string           `json:"order_id"`

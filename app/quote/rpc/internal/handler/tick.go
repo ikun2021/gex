@@ -26,20 +26,20 @@ type TickHandle struct {
 	ticker       *time.Ticker
 	batchData    []*matchMq.MatchResult
 	svcCtx       *svc.ServiceContext
-	msgChan      chan *matchMq.MatchResult
+	msgChan      chan *matchMq.MatchOutput
 	currentMsgId pulsar.MessageID
 	sendChan     chan *matchMq.MatchResult
 	symbolInfo   models.Symbol
+	latestMsgId  int64
 }
 
 func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol models.Symbol) TickHandle {
-	ticker := time.NewTicker(time.Second * 2)
-	c := make(chan *matchMq.MatchResult, 10)
+	ticker := time.NewTicker(time.Minute)
 	t := TickHandle{
 		consumer:   consumer,
 		ticker:     ticker,
 		svcCtx:     svcCtx,
-		msgChan:    c,
+		msgChan:    make(chan *matchMq.MatchOutput, 10),
 		symbolInfo: symbol,
 		sendChan:   make(chan *matchMq.MatchResult, 10),
 	}
@@ -53,10 +53,15 @@ func (t *TickHandle) Handle(message pulsar.Message) {
 		logx.Errorw("unmarshal failed", logger.ErrorField(err))
 		return
 	}
+	if t.latestMsgId >= m.MessageId {
+		logx.Slowf("recv ignore current msgId %v recv msgId %v", t.latestMsgId, m.MessageId)
+		return
+	}
+	t.msgChan <- &m
 
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
-		t.msgChan <- r.MatchResult
+
 		t.sendChan <- r.MatchResult
 		t.currentMsgId = message.ID()
 	}
@@ -115,15 +120,20 @@ func (t TickHandle) start() {
 
 		// 情况 B: 收到新消息 -> 放入缓冲区
 		case matchResult := <-t.msgChan:
-
-			t.batchData = append(t.batchData, matchResult)
+			switch r := matchResult.Result.(type) {
+			case *matchMq.MatchOutput_MatchResult:
+				t.batchData = append(t.batchData, r.MatchResult)
+			default:
+				continue
+			}
 
 			// 数量够了 -> 提交
-			if len(t.batchData) >= 10 {
+			if len(t.batchData) >= 100 {
 				t.commitBatch()
 				// 重置定时器，防止刚提交完马上又触发定时任务，浪费资源
 				t.ticker.Reset(2 * time.Second)
 			}
+			t.latestMsgId = matchResult.MessageId
 		}
 	}
 }

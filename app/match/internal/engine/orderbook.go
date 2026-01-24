@@ -24,7 +24,7 @@ func (ob *OrderBook) Copy() *OrderBook {
 	// 复制所有订单
 	values := ob.orderBook.Values()
 	for _, value := range values {
-		order := value.(*Order)
+		order := value.(*InputMessage)
 		// 创建新的订单副本
 		newOrder := *order // 复制订单结构体
 		newOrderBook.add(&newOrder)
@@ -57,7 +57,7 @@ func (ob *OrderBook) dump() {
 	if ob.side == enum.Side_Sell {
 		// 卖盘按价格从高到低显示
 		for i := len(values) - 1; i >= 0; i-- {
-			order := values[i].(*Order)
+			order := values[i].(*InputMessage)
 			fmt.Printf("  📄 订单 #%d:\n", i+1)
 			fmt.Printf("    🆔 订单ID: %s\n", order.OrderID)
 			fmt.Printf("    📍 价格: %s\n", order.Price.String())
@@ -73,7 +73,7 @@ func (ob *OrderBook) dump() {
 	} else {
 		// 买盘按价格从高到低显示
 		for i := len(values) - 1; i >= 0; i-- {
-			order := values[i].(*Order)
+			order := values[i].(*InputMessage)
 			fmt.Printf("  📄 订单 #%d:\n", i+1)
 			fmt.Printf("    🆔 订单ID: %s\n", order.OrderID)
 			fmt.Printf("    📍 价格: %s\n", order.Price.String())
@@ -103,7 +103,7 @@ func NewOrderBook(side enum.Side) *OrderBook {
 	order.orderBook = orderBook
 	return order
 }
-func (ob *OrderBook) add(order *Order) {
+func (ob *OrderBook) add(order *InputMessage) {
 	k := &Key{
 		price: order.Price,
 		id:    order.OrderPkId,
@@ -112,7 +112,7 @@ func (ob *OrderBook) add(order *Order) {
 	ob.orderBook.Put(k, order)
 
 }
-func (ob *OrderBook) remove(order *Order) {
+func (ob *OrderBook) remove(order *InputMessage) {
 	k := &Key{
 		price: order.Price,
 		id:    order.OrderPkId,
@@ -148,14 +148,14 @@ func (ob *OrderBook) String() string {
 	values := ob.orderBook.Values()
 	if ob.side == enum.Side_Sell {
 		for i := len(values) - 1; i >= 0; i-- {
-			order := values[i].(*Order)
+			order := values[i].(*InputMessage)
 			str += fmt.Sprintf("[side=%v]orderID=%v Price=%v qty=%v unfilledQty=%v QuoteAmount=%v unfilledAmount=%v\n", enum.Side_Sell, order.OrderID, order.Price, order.BaseAmount, order.UnfilledBaseAmount, order.QuoteAmount, order.UnfilledQuoteAmount)
 
 		}
 
 	} else {
 		for i := 0; i < len(values); i++ {
-			order := values[i].(*Order)
+			order := values[i].(*InputMessage)
 			str += fmt.Sprintf("[side=%v]orderID=%v Price=%v qty=%v unfilledQty=%v QuoteAmount=%v unfilledAmount=%v\n", enum.Side_Buy, order.OrderID, order.Price, order.BaseAmount, order.UnfilledBaseAmount, order.QuoteAmount, order.UnfilledQuoteAmount)
 		}
 	}

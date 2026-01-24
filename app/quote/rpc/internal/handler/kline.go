@@ -81,7 +81,10 @@ func (kl *KlineHandler) Handle(msg pulsar.Message) {
 		}
 		return
 	}
-
+	if kl.latestMatchId >= m.MessageId {
+		logx.Slowf("recv ignore current msgId %v recv msgId %v", kl.latestMatchId, m.MessageId)
+		return
+	}
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
 		logx.Debugw("receive match result data ", logx.Field("data", r))
