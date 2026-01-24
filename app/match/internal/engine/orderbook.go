@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"github.com/apache/pulsar-client-go/pulsar"
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	enum "github.com/ikun2021/gex/common/proto/enum"
 	"github.com/shopspring/decimal"
@@ -35,7 +34,6 @@ func (ob *OrderBook) Copy() *OrderBook {
 }
 
 func (ob *OrderBook) dump() {
-	pulsar.DeserializeMessageID()
 	sideStr := "买盘 (BIDS)"
 	if ob.side == enum.Side_Sell {
 		sideStr = "卖盘 (ASKS)"

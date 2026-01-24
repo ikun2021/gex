@@ -225,6 +225,8 @@ func (d *DepthHandler) Handle(message pulsar.Message) {
 			amount: utils.NewFromString(t.CancelResult.Amount),
 		}
 		d.handle(p, t.CancelResult.Side, Delete, 0)
+	case *matchMq.MatchOutput_MatchResult:
+		
 	}
 }
 func (d *DepthHandler) handle(p *position, side enum.Side, op opType, version int64) {
