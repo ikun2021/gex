@@ -3,15 +3,18 @@ package svc
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/config"
+	ws "github.com/luxun9527/gpush/proto"
 	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type ServiceContext struct {
 	Config       config.Config
 	PulsarClient pulsar.Client
 	RedisClient  *redis.Redis
+	WsClient     ws.ProxyClient
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -27,5 +30,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:       c,
 		PulsarClient: client,
 		RedisClient:  redisClient,
+		WsClient:     ws.NewProxyClient(zrpc.MustNewClient(c.WsConf).Conn()),
 	}
 }

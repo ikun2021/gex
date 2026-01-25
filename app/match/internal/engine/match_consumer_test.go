@@ -18,7 +18,7 @@ import (
 )
 
 func TestMatch(t *testing.T) {
-	// Create a Redis client with a mock address for testing
+	// Create a Redis wsClient with a mock address for testing
 	mockRedisClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379", // Will not connect in tests
 	})
@@ -92,7 +92,7 @@ func TestMatch(t *testing.T) {
 
 }
 func TestMatchCancel(t *testing.T) {
-	// Create a Redis client with a mock address for testing
+	// Create a Redis wsClient with a mock address for testing
 	mockRedisClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379", // Will not connect in tests
 	})

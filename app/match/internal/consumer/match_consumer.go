@@ -33,7 +33,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init pulsar producer failed %v", err)
 			}
-			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient)
+			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient, sc.WsClient)
 
 			for {
 				message, err := consumer.Receive(ctx)

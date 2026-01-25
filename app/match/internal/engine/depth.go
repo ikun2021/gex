@@ -3,7 +3,7 @@ package engine
 import (
 	"context"
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
-	"github.com/ikun2021/gex/app/match/rpc/internal/config"
+	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/enum"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	"github.com/ikun2021/gex/common/utils"
@@ -27,7 +27,7 @@ type DepthHandler struct {
 	ChangedPosition     chan DepthData
 	paramChan           chan *param
 	proxyClient         ws.ProxyClient
-	c                   *config.Config
+	symbolInfo          *models.Symbol
 	currentVersion,     //当前版本
 	lastVersion int64 //上一个版本
 }
@@ -39,7 +39,7 @@ type DepthData struct {
 	CurrentVersion int64
 }
 
-func NewDepthHandler(version int64, c *config.Config, proxyClient ws.ProxyClient) *DepthHandler {
+func NewDepthHandler(version int64, symbolInfo *models.Symbol, proxyClient ws.ProxyClient) *DepthHandler {
 	dh := &DepthHandler{
 		asks:                rbt.NewWith(DepthComparator),
 		bids:                rbt.NewWith(DepthComparator),
@@ -50,7 +50,7 @@ func NewDepthHandler(version int64, c *config.Config, proxyClient ws.ProxyClient
 		paramChan:           make(chan *param, 10),
 		ChangedPosition:     make(chan DepthData, 10),
 		proxyClient:         proxyClient,
-		c:                   c,
+		symbolInfo:          symbolInfo,
 		currentVersion:      version,
 		lastVersion:         version,
 	}
@@ -103,6 +103,9 @@ func (d *DepthHandler) handeUpdateDepth() {
 		select {
 		case par := <-d.paramChan:
 			d.plock.Lock()
+			if par.version < d.currentVersion {
+				continue
+			}
 			var changedPosition *position
 			//更新深度
 			if par.side == enum.Side_Sell {
@@ -154,11 +157,11 @@ func (d *DepthHandler) handeUpdateDepth() {
 			}
 			d.plock.Unlock()
 			if par.side == enum.Side_Buy && changedPosition != nil {
-				d.bidsChangedPosition[par.p.price.String()] = changedPosition.castToPosition(d.c.SymbolInfo.BaseCoinPrec.Load(), d.c.SymbolInfo.QuoteCoinPrec.Load())
+				d.bidsChangedPosition[par.p.price.String()] = changedPosition.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.QuoteCoinPrec)
 			}
 
 			if par.side == enum.Side_Sell && changedPosition != nil {
-				d.asksChangedPosition[par.p.price.String()] = changedPosition.castToPosition(d.c.SymbolInfo.BaseCoinPrec.Load(), d.c.SymbolInfo.QuoteCoinPrec.Load())
+				d.asksChangedPosition[par.p.price.String()] = changedPosition.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.QuoteCoinPrec)
 			}
 			d.currentVersion = par.version
 		case <-d.t.C:
@@ -203,7 +206,7 @@ func (d *DepthHandler) updateDepth(p *position, side enum.Side, op opType, versi
 		op:      op,
 		version: version,
 	}
-	logx.Debugf("updateDepth %+v op=%v side=%v", p.castToPosition(d.c.SymbolInfo.BaseCoinPrec.Load(), d.c.SymbolInfo.QuoteCoinPrec.Load()), op, side)
+	logx.Debugf("updateDepth %+v op=%v side=%v", p.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.QuoteCoinPrec), op, side)
 	d.paramChan <- par
 }
 
@@ -220,7 +223,7 @@ func (d *DepthHandler) getDepth(level int32) DepthData {
 			break
 		}
 		p := asksIter.Value().(*position)
-		a = append(a, p.castToPosition(d.c.SymbolInfo.BaseCoinPrec.Load(), d.c.SymbolInfo.QuoteCoinPrec.Load()))
+		a = append(a, p.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.BaseCoinPrec))
 
 	}
 	bidsIter := d.bids.Iterator()
@@ -229,7 +232,7 @@ func (d *DepthHandler) getDepth(level int32) DepthData {
 			break
 		}
 		p := bidsIter.Value().(*position)
-		b = append(b, p.castToPosition(d.c.SymbolInfo.BaseCoinPrec.Load(), d.c.SymbolInfo.QuoteCoinPrec.Load()))
+		b = append(b, p.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.BaseCoinPrec))
 	}
 	depthData.Bids = b
 	depthData.Asks = a
@@ -259,12 +262,12 @@ func (d *DepthHandler) pushChangedPosition() {
 		depth := commonWs.Depth{
 			LastVersion:    cast.ToString(data.LastVersion),
 			CurrentVersion: cast.ToString(data.CurrentVersion),
-			Symbol:         d.c.SymbolInfo.SymbolName,
+			Symbol:         d.symbolInfo.Name,
 			Asks:           asks,
 			Bids:           bids,
 		}
 		msg := commonWs.Message[commonWs.Depth]{
-			Topic:   commonWs.DepthPrefix.WithParam(d.c.SymbolInfo.SymbolName),
+			Topic:   commonWs.DepthPrefix.WithParam(d.symbolInfo.Name),
 			Payload: depth,
 		}
 

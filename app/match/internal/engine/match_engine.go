@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,7 +32,6 @@ type MatchEngine struct {
 	bestAsk                decimal.Decimal //卖一价
 	symbolConf             models.Symbol
 	producer               pulsar.Producer
-	proxyClient            ws.ProxyClient
 	currentMsgId           int64
 	quoteCoinPrecision     int32
 	baseCoinPrecision      int32
@@ -41,6 +41,7 @@ type MatchEngine struct {
 	version                int64
 	currentPulsarMessageId pulsar.MessageID
 	depthHandler           *DepthHandler
+	wsClient               ws.ProxyClient
 }
 
 func (m *MatchEngine) Gte(msgId int64) bool {
@@ -236,7 +237,7 @@ type AcceptedResp struct {
 	Uid int64
 }
 
-func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer, redisClient *redis.Redis) *MatchEngine {
+func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer, redisClient *redis.Redis, client ws.ProxyClient) *MatchEngine {
 	me := &MatchEngine{
 		asks:               NewOrderBook(enum.Side_Sell),
 		bids:               NewOrderBook(enum.Side_Buy),
@@ -249,6 +250,7 @@ func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Produce
 		redisClient:        redisClient,
 		input:              make(chan *InputMessage, 1000),
 		storeChan:          make(chan *SnapshotData, 1000),
+		wsClient:           client,
 	}
 	me.recover()
 	return me
@@ -899,18 +901,27 @@ type SnapshotData struct {
 func (m *MatchEngine) recover() {
 	key := fmt.Sprintf("match_engine_snapshot:%d", m.symbolConf.Id)
 	val, err := m.redisClient.Get(key)
-	if err != nil || val == "" {
-		return
+	if err != nil && !errors.Is(err, redis.Nil) {
+		logx.Severef("match engine recover failed symbol=%v err=%v", m.symbolConf.Name, err)
 	}
 	var data SnapshotData
 	if err := json.Unmarshal([]byte(val), &data); err != nil {
 		logx.Errorf("match engine recover unmarshal failed symbol=%v err=%v", m.symbolConf.Name, err)
 		return
 	}
+	m.depthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
 	for _, v := range data.Asks {
+		m.depthHandler.updateDepth(&position{
+			price: v.Price,
+			qty:   v.UnfilledBaseAmount,
+		}, enum.Side_Sell, Add, v.MessageId)
 		m.asks.add(v)
 	}
 	for _, v := range data.Bids {
+		m.depthHandler.updateDepth(&position{
+			price: v.Price,
+			qty:   v.UnfilledBaseAmount,
+		}, enum.Side_Buy, Delete, v.MessageId)
 		m.bids.add(v)
 	}
 	m.currentMsgId = data.CurrentMsgId
