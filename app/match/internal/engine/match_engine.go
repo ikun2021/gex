@@ -40,6 +40,7 @@ type MatchEngine struct {
 	storeChan              chan *SnapshotData
 	version                int64
 	currentPulsarMessageId pulsar.MessageID
+	depthHandler           *DepthHandler
 }
 
 func (m *MatchEngine) Gte(msgId int64) bool {
@@ -548,7 +549,13 @@ LOOP:
 		m.updateBestAsk()
 	}
 	//更新深度数据
-
+	for _, record := range matchMsg.MatchResult.MatchedRecords {
+		p := &position{
+			price: record.Price,
+			qty:   record.Qty,
+		}
+		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
+	}
 	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
 	if len(matchMsg.MatchResult.MatchedRecords) > 0 {
 		m.SendResult(matchMsg)
@@ -676,7 +683,19 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *InputMessage) {
 	}
 	//如果taker还是部分匹配，将订单加入的买盘中
 	if takerOrder.OrderStatus == enum.OrderStatus_PartFilled {
-
+		m.addOrder(takerOrder)
+		p := &position{
+			price: takerOrder.Price,
+			qty:   takerOrder.UnfilledBaseAmount,
+		}
+		m.depthHandler.updateDepth(p, enum.Side_Buy, Add, 0)
+	} //更新深度数据
+	for _, record := range matchMsg.MatchResult.MatchedRecords {
+		p := &position{
+			price: record.Price,
+			qty:   record.Qty,
+		}
+		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
 	}
 	//更新深度数据
 
@@ -796,6 +815,11 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 	if takerOrder.OrderStatus == enum.OrderStatus_PartFilled {
 
 		m.addOrder(takerOrder)
+		p := &position{
+			price: takerOrder.Price,
+			qty:   takerOrder.UnfilledBaseAmount,
+		}
+		m.depthHandler.updateDepth(p, enum.Side_Sell, Add, 0)
 
 	}
 	//更新深度数据
@@ -926,7 +950,11 @@ func (m *MatchEngine) handle(order *InputMessage) {
 		order.BaseAmount = orderDetail.BaseAmount
 		//订单簿删除订单
 		m.cancelOrder(order)
-
+		//更新盘口深度
+		m.depthHandler.updateDepth(&position{
+			price: order.Price,
+			qty:   order.UnfilledBaseAmount,
+		}, order.Side, Delete, 0)
 		//发送取消订单消息
 
 		coinId, qty := m.symbolConf.BaseCoinId, order.UnfilledBaseAmount.String()
@@ -959,19 +987,11 @@ func (m *MatchEngine) handle(order *InputMessage) {
 			} else {
 
 				m.addOrder(order)
-				m.SendResult(&MatchOutputMessage{
-					MatchResult:  nil,
-					CancelResult: nil,
-					AcceptedResult: &AcceptedResult{
-						OrderId:     order.OrderID,
-						Uid:         order.Uid,
-						side:        order.Side,
-						price:       order.Price.String(),
-						quoteAmount: order.QuoteAmount.String(),
-						baseAmount:  order.BaseAmount.String(),
-					},
-					MsgType: MsgTypeAcceptedResult,
-				})
+				//更新盘口深度
+				m.depthHandler.updateDepth(&position{
+					price: order.Price,
+					qty:   order.UnfilledBaseAmount,
+				}, order.Side, Add, 0)
 				//更新盘口深度
 			}
 		//卖单市价单
@@ -999,19 +1019,11 @@ func (m *MatchEngine) handle(order *InputMessage) {
 
 				m.addOrder(order)
 				//更新盘口深度
-				m.SendResult(&MatchOutputMessage{
-					MatchResult:  nil,
-					CancelResult: nil,
-					AcceptedResult: &AcceptedResult{
-						OrderId:     order.OrderID,
-						Uid:         order.Uid,
-						side:        order.Side,
-						price:       order.Price.String(),
-						quoteAmount: order.QuoteAmount.String(),
-						baseAmount:  order.BaseAmount.String(),
-					},
-					MsgType: MsgTypeAcceptedResult,
-				})
+				//更新盘口深度
+				m.depthHandler.updateDepth(&position{
+					price: order.Price,
+					qty:   order.UnfilledBaseAmount,
+				}, order.Side, Add, 0)
 
 			}
 		}
