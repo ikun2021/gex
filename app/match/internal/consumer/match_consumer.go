@@ -21,8 +21,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 	for _, v := range sc.Config.Symbol {
 		go func(symbol models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:  defines.MatchTopicInputPrefix + symbol.Name,
-				Topics: nil,
+				Topic: defines.MatchTopicInputPrefix + symbol.Name,
 			})
 			if err != nil {
 				logx.Severef("init match consumer error:%v", err)
