@@ -206,7 +206,7 @@ func (kl *KlineHandler) store() {
 					return nil
 				})
 				if err != nil {
-					logx.Errorf("store message to mysql failed err = %v message id %v", err, kl.latestMessageID)
+					logx.Errorf("store message to mysql failed err = %v message id %v", err, klineData.MessageID)
 					time.Sleep(time.Second * 3)
 				}
 
@@ -223,7 +223,7 @@ func (kl *KlineHandler) store() {
 					}
 
 					if klineData.MessageID != nil {
-						if err := kl.consumer.AckIDCumulative(kl.latestMessageID); err != nil {
+						if err := kl.consumer.AckIDCumulative(klineData.MessageID); err != nil {
 							logx.Errorw("consumer message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
 							return err
 						}

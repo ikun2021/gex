@@ -36,7 +36,6 @@ func NewCreateOrderLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Creat
 	}
 }
 
-// 创建订单,下单有分布式事务要处理分为两个接口
 func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, error) {
 	// 2. 计算需要冻结的金额与币种
 	var freezeCurrency string
@@ -44,7 +43,7 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	var err error
 
 	price, _ := decimal.NewFromString(in.Price)
-	amount, _ := decimal.NewFromString(in.BaseAmount)
+	amount, err := decimal.NewFromString(in.BaseAmount)
 
 	// 1. 解析交易对 (如 BTC_USDT -> Base:BTC, Quote:USDT)
 	parts := strings.Split(in.SymbolName, "_")
@@ -85,18 +84,23 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	if cast.ToInt64(res) == 0 {
 		return nil, errors.New("insufficient balance") // 余额不足
 	}
-	msg := &matchMq.MatchReq{Operate: &matchMq.MatchReq_NewOrder{
-		NewOrder: &matchMq.NewOrderOperate{
-			OrderId:     orderId,
-			SequenceId:  seqId,
-			Uid:         in.UserId,
-			Side:        in.Side,
-			Price:       in.Price,
-			BaseAmount:  in.BaseAmount,
-			QuoteAmount: in.QuoteAmount,
-			OrderType:   in.OrderType,
+	msg := &matchMq.MatchInput{
+		Event: &matchMq.MatchInput_CreateOrder{
+			CreateOrder: &matchMq.CreateOrderEvent{
+				OrderId:     orderId,
+				SequenceId:  0,
+				Uid:         in.UserId,
+				Side:        in.Side,
+				Price:       price.String(),
+				BaseAmount:  amount.String(),
+				QuoteAmount: in.QuoteAmount,
+				OrderType:   in.OrderType,
+				SymbolId:    in.SymbolId,
+				SymbolName:  in.SymbolName,
+			},
 		},
-	}}
+		MessageId: idgen.NextId(),
+	}
 	data, _ := proto.Marshal(msg)
 	if _, err := l.svcCtx.MatchProducer.Send(l.ctx, &pulsar.ProducerMessage{
 		Payload: data,
