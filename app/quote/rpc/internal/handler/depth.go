@@ -33,7 +33,7 @@ type DepthHandler struct {
 	proxyClient         ws.ProxyClient
 	symbolInfo          models.Symbol
 	consumer            pulsar.Consumer
-	currentVersion, //当前版本
+	currentVersion,     //当前版本
 	lastVersion int64 //上一个版本
 }
 

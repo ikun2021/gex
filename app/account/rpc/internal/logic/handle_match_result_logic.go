@@ -18,7 +18,7 @@ type HandleMatchResultLogic struct {
 }
 
 // HandleMatchResult  结算，扣减用户资产
-func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_MatchResult, storeConsumedMessageId func() error) error {
+func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_MatchResult, storeConsumedMessageId func() error) error {
 	if len(result.MatchResult.MatchedRecord) == 0 {
 		return nil
 	}
@@ -141,9 +141,7 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchResp_Mat
 				}
 			}
 		}
-		if err := storeConsumedMessageId(); err != nil {
-			return err
-		}
+
 		return nil
 	}); err != nil {
 		logx.Errorw("HandleMatchResultLogic HandleCancelOrder err", logger.ErrorField(err))
