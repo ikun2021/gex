@@ -33,7 +33,10 @@ matchmq:
 	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
 
 model1:
-	gentool --dsn="root:root@tcp(192.168.2.159:3308)/gex?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/quote/rpc/internal/dao/quote/query -fieldMap="decimal:string;tinyint:int32;int:int64,bigint:int64" -tables="trades,kline"
+	gentool --dsn="root:root@tcp(192.168.2.159:3308)/gex?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/quote/rpc/internal/dao/quote/query -fieldMap="decimal:string;tinyint:int32;int:int64;bigint:int64" -tables="trades,kline"
+
+model2:
+	gentool --dsn="root:root@tcp(192.168.2.159:3308)/gex?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/accoun/rpc/internal/dao/quote/query -fieldMap="decimal:string;tinyint:int32;int:int64;bigint:int64"  -tables="matched_order"
 
 run:
 	make pre
