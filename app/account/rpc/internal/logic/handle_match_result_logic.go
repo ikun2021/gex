@@ -4,19 +4,22 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
+	"github.com/ikun2021/gex/common/proto/define"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// Lua脚本：原子性处理撮合结果的资产结算和订单索引管理
+// Lua脚本：原子性处理撮合结果的资产结算和订单索引管理（增加幂等性检查）
 // KEYS[1]: takerBalanceKey (balance:{taker_uid})
 // KEYS[2]: makerBalanceKey (balance:{maker_uid})
 // KEYS[3]: takerOpenOrdersKey (open_orders:{taker_uid}:{symbol})
 // KEYS[4]: makerOpenOrdersKey (open_orders:{maker_uid}:{symbol})
+// KEYS[5]: idempotentKey (match_processed:{match_sub_id})
 // ARGV[1]: takerFrozenField (冻结字段，如 "USDT_frozen" 或 "BTC_frozen")
 // ARGV[2]: takerAvailField (可用字段，如 "USDT" 或 "BTC")
 // ARGV[3]: takerFrozenDeduct (taker扣减的冻结金额，int64)
@@ -29,11 +32,18 @@ import (
 // ARGV[10]: takerOrderStatus (taker订单状态: 3=全部成交)
 // ARGV[11]: makerOrderId (maker订单ID)
 // ARGV[12]: makerOrderStatus (maker订单状态: 3=全部成交)
+// ARGV[13]: idempotentEx (幂等键过期时间)
 var atomicSettleScript = redis.NewScript(`
 local takerBalanceKey = KEYS[1]
 local makerBalanceKey = KEYS[2]
 local takerOpenOrdersKey = KEYS[3]
 local makerOpenOrdersKey = KEYS[4]
+local idempotentKey = KEYS[5]
+
+-- 1. 幂等检查
+if redis.call("EXISTS", idempotentKey) == 1 then
+    return 1 -- 已处理，直接返回成功
+end
 
 local takerFrozenField = ARGV[1]
 local takerAvailField = ARGV[2]
@@ -49,31 +59,67 @@ local takerOrderId = ARGV[9]
 local takerOrderStatus = tonumber(ARGV[10])
 local makerOrderId = ARGV[11]
 local makerOrderStatus = tonumber(ARGV[12])
+local idempotentEx = tonumber(ARGV[13])
 
--- 处理 taker 资产
--- 扣减冻结资产
+-- 2. 处理 taker 资产
 redis.call("HINCRBY", takerBalanceKey, takerFrozenField, -takerFrozenDeduct)
--- 增加可用资产
 redis.call("HINCRBY", takerBalanceKey, takerAvailField, takerAvailAdd)
 
--- 处理 maker 资产
--- 扣减冻结资产
+-- 3. 处理 maker 资产
 redis.call("HINCRBY", makerBalanceKey, makerFrozenField, -makerFrozenDeduct)
--- 增加可用资产
 redis.call("HINCRBY", makerBalanceKey, makerAvailField, makerAvailAdd)
 
--- 处理 taker 订单索引
--- 如果订单完全成交 (status=3)，从用户当前委托中移除
+-- 4. 处理 taker 订单索引
 if takerOrderStatus == 3 then
     redis.call("ZREM", takerOpenOrdersKey, takerOrderId)
 end
 
--- 处理 maker 订单索引
--- 如果订单完全成交 (status=3)，从用户当前委托中移除
+-- 5. 处理 maker 订单索引
 if makerOrderStatus == 3 then
     redis.call("ZREM", makerOpenOrdersKey, makerOrderId)
 end
 
+-- 6. 标记为已处理
+redis.call("SET", idempotentKey, "1", "EX", idempotentEx)
+
+return 1
+`)
+
+// Lua脚本：原子性处理订单接收（加入索引）
+// KEYS[1]: openOrdersKey (open_orders:{uid}:{symbol})
+// KEYS[2]: idempotentKey (match_processed:accept:{message_id})
+// ARGV[1]: orderId (订单ID)
+// ARGV[2]: score (时间戳)
+// ARGV[3]: idempotentEx (过期时间)
+var atomicAcceptScript = redis.NewScript(`
+if redis.call("EXISTS", KEYS[2]) == 1 then
+    return 1
+end
+redis.call("ZADD", KEYS[1], ARGV[2], ARGV[1])
+redis.call("SET", KEYS[2], "1", "EX", ARGV[3])
+return 1
+`)
+
+// Lua脚本：原子性处理订单取消（解冻资产 + 删除索引）
+// KEYS[1]: balanceKey (balance:{uid})
+// KEYS[2]: openOrdersKey (open_orders:{uid}:{symbol})
+// KEYS[3]: idempotentKey (match_processed:cancel:{message_id})
+// ARGV[1]: frozenField (冻结字段)
+// ARGV[2]: availField (可用字段)
+// ARGV[3]: amount (解冻数量, int64)
+// ARGV[4]: orderId (订单ID)
+// ARGV[5]: idempotentEx (过期时间)
+var atomicCancelScript = redis.NewScript(`
+if redis.call("EXISTS", KEYS[3]) == 1 then
+    return 1
+end
+-- 1. 解冻
+redis.call("HINCRBY", KEYS[1], ARGV[1], -tonumber(ARGV[3]))
+redis.call("HINCRBY", KEYS[1], ARGV[2], tonumber(ARGV[3]))
+-- 2. 删除索引
+redis.call("ZREM", KEYS[2], ARGV[4])
+-- 3. 标记已处理
+redis.call("SET", KEYS[3], "1", "EX", ARGV[5])
 return 1
 `)
 
@@ -188,8 +234,9 @@ func (l *HandleMatchResultLogic) settleMatchedRecord(matchResult *matchMq.MatchR
 	makerBalanceKey := fmt.Sprintf("balance:%d", maker.Uid)
 	takerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", taker.Uid, symbolName)
 	makerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", maker.Uid, symbolName)
+	idempotentKey := fmt.Sprintf("match_processed:%s", record.MatchSubId)
 
-	keys := []string{takerBalanceKey, makerBalanceKey, takerOpenOrdersKey, makerOpenOrdersKey}
+	keys := []string{takerBalanceKey, makerBalanceKey, takerOpenOrdersKey, makerOpenOrdersKey, idempotentKey}
 	args := []interface{}{
 		takerFrozenField,         // ARGV[1]
 		takerAvailField,          // ARGV[2]
@@ -203,6 +250,7 @@ func (l *HandleMatchResultLogic) settleMatchedRecord(matchResult *matchMq.MatchR
 		int32(taker.OrderStatus), // ARGV[10]
 		maker.OrderId,            // ARGV[11]
 		int32(maker.OrderStatus), // ARGV[12]
+		3600 * 24,                // ARGV[13] 幂等记录 24 小时过期
 	}
 
 	// 执行原子脚本
@@ -230,12 +278,87 @@ func NewHandleMatchResultLogic(svcCtx *svc.ServiceContext) *HandleMatchResultLog
 	}
 }
 
-// HandleCancelOrder 取消订单解冻
-func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.MatchOutput_CancelResult, storeConsumedMessageId func() error) error {
-	// TODO: 实现取消订单的解冻逻辑
+func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelResult, messageId int64, storeConsumedMessageId func() error) error {
+	res := cancelResp
+	ctx := context.Background()
+
+	// 1. 获取币种名称
+	coinName := l.getCoinName(res.CoinId)
+	if coinName == "" {
+		logx.Errorw("coin not found", logx.Field("coinId", res.CoinId))
+		return fmt.Errorf("coin not found: %d", res.CoinId)
+	}
+
+	// 2. 准备解冻数量
+	unfreezeAmount, err := utils.ToDBInteger(coinName, res.Amount)
+	if err != nil {
+		return fmt.Errorf("convert amount failed: %w", err)
+	}
+
+	// 3. 构建订单 ID
+	// 策略：限价单(2) + 方向 + ID
+	orderId := fmt.Sprintf("%d%d%d", 2, int32(res.Side), res.Id)
+
+	// 4. 处理资产解冻
+	balanceKey := fmt.Sprintf("balance:%d", res.Uid)
+	idempotentKey := fmt.Sprintf("match_processed:cancel:%d", messageId)
+
+	// TODO: 目前 CancelResult 缺少 symbol_name，暂时无法删除分区索引 open_orders:{uid}:{symbol}
+	// 后续如果协议更新，可以将 dummy 替换为真实 key。
+	keys := []string{balanceKey, "open_orders_dummy", idempotentKey}
+	args := []interface{}{
+		coinName + "_frozen",
+		coinName,
+		unfreezeAmount,
+		orderId,
+		3600 * 24,
+	}
+
+	_, err = atomicCancelScript.Run(ctx, l.svcCtx.RedisCli, keys, args...).Result()
+	if err != nil {
+		return fmt.Errorf("execute cancel script failed: %w", err)
+	}
+
+	if err := storeConsumedMessageId(); err != nil {
+		return err
+	}
 	return nil
 }
-func (l *HandleMatchResultLogic) HandleAcceptOrder(cancelResp *matchMq.MatchOutput_AcceptedResult, storeConsumedMessageId func() error) error {
-	// TODO: 实现取消订单的解冻逻辑
+
+func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.AcceptedResult, messageId int64, storeConsumedMessageId func() error) error {
+	res := acceptResult
+	ctx := context.Background()
+
+	openOrdersKey := fmt.Sprintf("open_orders:%d:%s", res.Uid, res.SymbolName)
+	idempotentKey := fmt.Sprintf("match_processed:accept:%d", messageId)
+
+	keys := []string{openOrdersKey, idempotentKey}
+	args := []interface{}{
+		res.OrderId,
+		time.Now().UnixMilli(),
+		3600 * 24,
+	}
+
+	_, err := atomicAcceptScript.Run(ctx, l.svcCtx.RedisCli, keys, args...).Result()
+	if err != nil {
+		return fmt.Errorf("execute accept script failed: %w", err)
+	}
+
+	if err := storeConsumedMessageId(); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (l *HandleMatchResultLogic) getCoinName(coinId int32) string {
+	name := ""
+	l.svcCtx.Coins.Range(func(key, value any) bool {
+		coin := value.(*define.CoinInfo)
+		if coin.CoinID == coinId {
+			name = coin.CoinName
+			return false
+		}
+		return true
+	})
+	return name
 }
