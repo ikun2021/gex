@@ -8,6 +8,8 @@ const (
 	AccountToken             RedisKey = "gex:account:token"
 	AccountConsumedMessageId RedisKey = "gex:account:consumed:messageId"
 	OrderConsumedMessageId   RedisKey = "gex:order:consumed:messageId"
+	OpenOrder                RedisKey = "gex:open_order"
+	AccountMatchProcessed    RedisKey = "gex:account_match_processed"
 )
 
 func (key RedisKey) WithSymbol(symbol string) string {

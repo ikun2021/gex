@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/cast"
 	"strings"
 	"time"
 
@@ -325,12 +326,13 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	return nil
 }
 
-func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.AcceptedResult, messageId int64, storeConsumedMessageId func() error) error {
+func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.AcceptedResult, messageId int64) error {
 	res := acceptResult
 	ctx := context.Background()
 
-	openOrdersKey := fmt.Sprintf("open_orders:%d:%s", res.Uid, res.SymbolName)
-	idempotentKey := fmt.Sprintf("match_processed:accept:%d", messageId)
+	openOrdersKey := define.OpenOrder.WithParams(cast.ToString(res.Uid))
+
+	idempotentKey := define.AccountMatchProcessed.WithParams(cast.ToString(messageId))
 
 	keys := []string{openOrdersKey, idempotentKey}
 	args := []interface{}{
@@ -344,9 +346,6 @@ func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.Accepte
 		return fmt.Errorf("execute accept script failed: %w", err)
 	}
 
-	if err := storeConsumedMessageId(); err != nil {
-		return err
-	}
 	return nil
 }
 
