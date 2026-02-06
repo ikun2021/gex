@@ -2,6 +2,8 @@ package order
 
 import (
 	"context"
+	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
+	"github.com/ikun2021/gex/common/proto/enum"
 
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
@@ -24,7 +26,19 @@ func NewCreateOrderLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Creat
 }
 
 func (l *CreateOrderLogic) CreateOrder(req *types.CreateOrderReq) (resp *types.Empty, err error) {
-	// todo: add your logic here and delete this line
+	_, err = l.svcCtx.OrderRpc.CreateOrder(l.ctx, &orderservice.CreateOrderReq{
+		UserId:      1,
+		SymbolId:    1,
+		SymbolName:  req.SymbolName,
+		BaseAmount:  req.BaseAmount,
+		Price:       req.Price,
+		QuoteAmount: req.QuoteAmount,
+		Side:        enum.Side(req.Side),
+		OrderType:   enum.OrderType(req.OrderType),
+	})
+	if err != nil {
+		l.Logger.Errorf("create order failed: %v", err)
+	}
+	return nil, err
 
-	return
 }

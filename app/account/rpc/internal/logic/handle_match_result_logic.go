@@ -3,9 +3,10 @@ package logic
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cast"
 	"strings"
 	"time"
+
+	"github.com/spf13/cast"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/proto/define"
@@ -15,74 +16,69 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// Lua脚本：原子性处理撮合结果的资产结算和订单索引管理（增加幂等性检查）
-// KEYS[1]: takerBalanceKey (balance:{taker_uid})
-// KEYS[2]: makerBalanceKey (balance:{maker_uid})
-// KEYS[3]: takerOpenOrdersKey (open_orders:{taker_uid}:{symbol})
-// KEYS[4]: makerOpenOrdersKey (open_orders:{maker_uid}:{symbol})
-// KEYS[5]: idempotentKey (match_processed:{match_sub_id})
-// ARGV[1]: takerFrozenField (冻结字段，如 "USDT_frozen" 或 "BTC_frozen")
-// ARGV[2]: takerAvailField (可用字段，如 "USDT" 或 "BTC")
-// ARGV[3]: takerFrozenDeduct (taker扣减的冻结金额，int64)
-// ARGV[4]: takerAvailAdd (taker增加的可用金额，int64)
-// ARGV[5]: makerFrozenField (冻结字段)
-// ARGV[6]: makerAvailField (可用字段)
-// ARGV[7]: makerFrozenDeduct (maker扣减的冻结金额，int64)
-// ARGV[8]: makerAvailAdd (maker增加的可用金额，int64)
-// ARGV[9]: takerOrderId (taker订单ID)
-// ARGV[10]: takerOrderStatus (taker订单状态: 3=全部成交)
-// ARGV[11]: makerOrderId (maker订单ID)
-// ARGV[12]: makerOrderStatus (maker订单状态: 3=全部成交)
-// ARGV[13]: idempotentEx (幂等键过期时间)
-var atomicSettleScript = redis.NewScript(`
-local takerBalanceKey = KEYS[1]
-local makerBalanceKey = KEYS[2]
-local takerOpenOrdersKey = KEYS[3]
-local makerOpenOrdersKey = KEYS[4]
-local idempotentKey = KEYS[5]
+// Lua脚本：原子性处理撮合结果的批量资产结算和订单索引管理
+// KEYS: 无 (动态传入)
+// ARGV[1]: 记录条数
+// ARGV[i*10 + 2]: takerBalanceKey
+// ARGV[i*10 + 3]: makerBalanceKey
+// ARGV[i*10 + 4]: takerOpenOrdersKey
+// ARGV[i*10 + 5]: makerOpenOrdersKey
+// ARGV[i*10 + 6]: idempotentKey
+// ARGV[i*10 + 7]: takerFrozenField, takerAvailField, takerFrozenDeduct, takerAvailAdd
+// ARGV[i*10 + 8]: makerFrozenField, makerAvailField, makerFrozenDeduct, makerAvailAdd
+// ARGV[i*10 + 9]: takerOrderId, takerOrderStatus
+// ARGV[index + 10]: makerOrderId, makerOrderStatus
+// ARGV[index + 11]: idempotentEx
+var atomicSettleBatchScript = redis.NewScript(`
+local count = tonumber(ARGV[1])
+for i=0, count-1 do
+    local offset = i * 11 + 1
+    local takerBalanceKey = ARGV[offset + 1]
+    local makerBalanceKey = ARGV[offset + 2]
+    local takerOpenOrdersKey = ARGV[offset + 3]
+    local makerOpenOrdersKey = ARGV[offset + 4]
+    local idempotentKey = ARGV[offset + 5]
+    
+    -- 1. 幂等检查
+    if redis.call("EXISTS", idempotentKey) == 0 then
+        local takerFrozenField = ARGV[offset + 6]
+        local takerAvailField = ARGV[offset + 7]
+        local takerFrozenDeduct = tonumber(ARGV[offset + 8])
+        local takerAvailAdd = tonumber(ARGV[offset + 9])
+        
+        local makerFrozenField = ARGV[offset + 10]
+        local makerAvailField = ARGV[offset + 11]
+        local makerFrozenDeduct = tonumber(ARGV[offset + 12])
+        local makerAvailAdd = tonumber(ARGV[offset + 13])
+        
+        local takerOrderId = ARGV[offset + 14]
+        local takerOrderStatus = tonumber(ARGV[offset + 15])
+        local makerOrderId = ARGV[offset + 16]
+        local makerOrderStatus = tonumber(ARGV[offset + 17])
+        local idempotentEx = tonumber(ARGV[offset + 18])
 
--- 1. 幂等检查
-if redis.call("EXISTS", idempotentKey) == 1 then
-    return 1 -- 已处理，直接返回成功
+        -- 2. 处理 taker 资产
+        redis.call("HINCRBY", takerBalanceKey, takerFrozenField, -takerFrozenDeduct)
+        redis.call("HINCRBY", takerBalanceKey, takerAvailField, takerAvailAdd)
+
+        -- 3. 处理 maker 资产
+        redis.call("HINCRBY", makerBalanceKey, makerFrozenField, -makerFrozenDeduct)
+        redis.call("HINCRBY", makerBalanceKey, makerAvailField, makerAvailAdd)
+
+        -- 4. 处理 taker 订单索引
+        if takerOrderStatus == 3 then
+            redis.call("ZREM", takerOpenOrdersKey, takerOrderId)
+        end
+
+        -- 5. 处理 maker 订单索引
+        if makerOrderStatus == 3 then
+            redis.call("ZREM", makerOpenOrdersKey, makerOrderId)
+        end
+
+        -- 6. 标记为已处理
+        redis.call("SET", idempotentKey, "1", "EX", idempotentEx)
+    end
 end
-
-local takerFrozenField = ARGV[1]
-local takerAvailField = ARGV[2]
-local takerFrozenDeduct = tonumber(ARGV[3])
-local takerAvailAdd = tonumber(ARGV[4])
-
-local makerFrozenField = ARGV[5]
-local makerAvailField = ARGV[6]
-local makerFrozenDeduct = tonumber(ARGV[7])
-local makerAvailAdd = tonumber(ARGV[8])
-
-local takerOrderId = ARGV[9]
-local takerOrderStatus = tonumber(ARGV[10])
-local makerOrderId = ARGV[11]
-local makerOrderStatus = tonumber(ARGV[12])
-local idempotentEx = tonumber(ARGV[13])
-
--- 2. 处理 taker 资产
-redis.call("HINCRBY", takerBalanceKey, takerFrozenField, -takerFrozenDeduct)
-redis.call("HINCRBY", takerBalanceKey, takerAvailField, takerAvailAdd)
-
--- 3. 处理 maker 资产
-redis.call("HINCRBY", makerBalanceKey, makerFrozenField, -makerFrozenDeduct)
-redis.call("HINCRBY", makerBalanceKey, makerAvailField, makerAvailAdd)
-
--- 4. 处理 taker 订单索引
-if takerOrderStatus == 3 then
-    redis.call("ZREM", takerOpenOrdersKey, takerOrderId)
-end
-
--- 5. 处理 maker 订单索引
-if makerOrderStatus == 3 then
-    redis.call("ZREM", makerOpenOrdersKey, makerOrderId)
-end
-
--- 6. 标记为已处理
-redis.call("SET", idempotentKey, "1", "EX", idempotentEx)
-
 return 1
 `)
 
@@ -135,7 +131,7 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_M
 		return nil
 	}
 
-	// 解析交易对，获取基础币和计价币
+	// 解析交易对，获取基础币 and 计价币
 	parts := strings.Split(result.MatchResult.SymbolName, "_")
 	if len(parts) != 2 {
 		logx.Errorw("invalid symbol format", logx.Field("symbol", result.MatchResult.SymbolName))
@@ -143,16 +139,27 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_M
 	}
 	baseCcy, quoteCcy := parts[0], parts[1]
 
-	// 处理每一条撮合记录
+	var batchArgs []interface{}
+	batchArgs = append(batchArgs, len(result.MatchResult.MatchedRecord)) // ARGV[1]: count
+
+	// 收集所有结算记录的参数
 	for _, record := range result.MatchResult.MatchedRecord {
-		if err := l.settleMatchedRecord(result.MatchResult, record, baseCcy, quoteCcy, result.MatchResult.SymbolName); err != nil {
-			logx.Errorw("settle matched record failed",
+		args, err := l.getSettleRecordArgs(result.MatchResult, record, baseCcy, quoteCcy, result.MatchResult.SymbolName)
+		if err != nil {
+			logx.Errorw("get settle record args failed",
 				logx.Field("error", err.Error()),
-				logx.Field("matchSubId", record.MatchSubId),
-				logx.Field("takerOrderId", record.Taker.OrderId),
-				logx.Field("makerOrderId", record.Maker.OrderId))
+				logx.Field("matchSubId", record.MatchSubId))
 			return err
 		}
+		batchArgs = append(batchArgs, args...)
+	}
+
+	// 执行批量原子脚本
+	ctx := context.Background()
+	_, err := atomicSettleBatchScript.Run(ctx, l.svcCtx.RedisCli, []string{}, batchArgs...).Result()
+	if err != nil {
+		logx.Errorw("execute batch settle script failed", logx.Field("error", err.Error()))
+		return fmt.Errorf("execute batch settle script failed: %w", err)
 	}
 
 	// 存储已消费的消息ID（用于幂等性）
@@ -161,12 +168,12 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_M
 		return err
 	}
 
+	logx.Infow("batch settle success", logx.Field("count", len(result.MatchResult.MatchedRecord)))
 	return nil
 }
 
-// settleMatchedRecord 处理单条撮合记录的资产结算
-func (l *HandleMatchResultLogic) settleMatchedRecord(matchResult *matchMq.MatchResult, record *matchMq.MatchResult_MatchedRecord, baseCcy, quoteCcy, symbolName string) error {
-	ctx := context.Background()
+// getSettleRecordArgs 准备单条撮合记录的结算参数
+func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchResult, record *matchMq.MatchResult_MatchedRecord, baseCcy, quoteCcy, symbolName string) ([]interface{}, error) {
 	taker := record.Taker
 	maker := record.Maker
 
@@ -177,100 +184,78 @@ func (l *HandleMatchResultLogic) settleMatchedRecord(matchResult *matchMq.MatchR
 	var makerFrozenDeduct, makerAvailAdd int64
 	var err error
 
-	// Taker 的资产变动
-	// 如果 taker 是买单，扣减冻结的计价币(quote)，增加可用的基础币(base)
-	// 如果 taker 是卖单，扣减冻结的基础币(base)，增加可用的计价币(quote)
 	if matchResult.TakerIsBuy {
-		// Taker 买入：扣减冻结的 USDT，增加可用的 BTC
 		takerFrozenField = quoteCcy + "_frozen"
 		takerAvailField = baseCcy
 		takerFrozenDeduct, err = utils.ToDBInteger(quoteCcy, taker.UnFrozenAmount)
 		if err != nil {
-			return fmt.Errorf("convert taker unfrozen amount failed: %w", err)
+			return nil, fmt.Errorf("convert taker unfrozen amount failed: %w", err)
 		}
 		takerAvailAdd, err = utils.ToDBInteger(baseCcy, record.BaseAmount)
 		if err != nil {
-			return fmt.Errorf("convert taker base amount failed: %w", err)
+			return nil, fmt.Errorf("convert taker base amount failed: %w", err)
 		}
 
-		// Maker 卖出：扣减冻结的 BTC，增加可用的 USDT
 		makerFrozenField = baseCcy + "_frozen"
 		makerAvailField = quoteCcy
 		makerFrozenDeduct, err = utils.ToDBInteger(baseCcy, maker.UnFrozenAmount)
 		if err != nil {
-			return fmt.Errorf("convert maker unfrozen amount failed: %w", err)
+			return nil, fmt.Errorf("convert maker unfrozen amount failed: %w", err)
 		}
 		makerAvailAdd, err = utils.ToDBInteger(quoteCcy, record.QuoteAmount)
 		if err != nil {
-			return fmt.Errorf("convert maker quote amount failed: %w", err)
+			return nil, fmt.Errorf("convert maker quote amount failed: %w", err)
 		}
 	} else {
-		// Taker 卖出：扣减冻结的 BTC，增加可用的 USDT
 		takerFrozenField = baseCcy + "_frozen"
 		takerAvailField = quoteCcy
 		takerFrozenDeduct, err = utils.ToDBInteger(baseCcy, taker.UnFrozenAmount)
 		if err != nil {
-			return fmt.Errorf("convert taker unfrozen amount failed: %w", err)
+			return nil, fmt.Errorf("convert taker unfrozen amount failed: %w", err)
 		}
 		takerAvailAdd, err = utils.ToDBInteger(quoteCcy, record.QuoteAmount)
 		if err != nil {
-			return fmt.Errorf("convert taker quote amount failed: %w", err)
+			return nil, fmt.Errorf("convert taker quote amount failed: %w", err)
 		}
 
-		// Maker 买入：扣减冻结的 USDT，增加可用的 BTC
 		makerFrozenField = quoteCcy + "_frozen"
 		makerAvailField = baseCcy
 		makerFrozenDeduct, err = utils.ToDBInteger(quoteCcy, maker.UnFrozenAmount)
 		if err != nil {
-			return fmt.Errorf("convert maker unfrozen amount failed: %w", err)
+			return nil, fmt.Errorf("convert maker unfrozen amount failed: %w", err)
 		}
 		makerAvailAdd, err = utils.ToDBInteger(baseCcy, record.BaseAmount)
 		if err != nil {
-			return fmt.Errorf("convert maker base amount failed: %w", err)
+			return nil, fmt.Errorf("convert maker base amount failed: %w", err)
 		}
 	}
 
-	// 准备 Lua 脚本参数
 	takerBalanceKey := fmt.Sprintf("balance:%d", taker.Uid)
 	makerBalanceKey := fmt.Sprintf("balance:%d", maker.Uid)
 	takerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", taker.Uid, symbolName)
 	makerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", maker.Uid, symbolName)
 	idempotentKey := fmt.Sprintf("match_processed:%s", record.MatchSubId)
 
-	keys := []string{takerBalanceKey, makerBalanceKey, takerOpenOrdersKey, makerOpenOrdersKey, idempotentKey}
-	args := []interface{}{
-		takerFrozenField,         // ARGV[1]
-		takerAvailField,          // ARGV[2]
-		takerFrozenDeduct,        // ARGV[3]
-		takerAvailAdd,            // ARGV[4]
-		makerFrozenField,         // ARGV[5]
-		makerAvailField,          // ARGV[6]
-		makerFrozenDeduct,        // ARGV[7]
-		makerAvailAdd,            // ARGV[8]
-		taker.OrderId,            // ARGV[9]
-		int32(taker.OrderStatus), // ARGV[10]
-		maker.OrderId,            // ARGV[11]
-		int32(maker.OrderStatus), // ARGV[12]
-		3600 * 24,                // ARGV[13] 幂等记录 24 小时过期
-	}
-
-	// 执行原子脚本
-	_, err = atomicSettleScript.Run(ctx, l.svcCtx.RedisCli, keys, args...).Result()
-	if err != nil {
-		logx.Errorw("execute settle script failed",
-			logx.Field("error", err.Error()),
-			logx.Field("matchSubId", record.MatchSubId))
-		return fmt.Errorf("execute settle script failed: %w", err)
-	}
-
-	logx.Infow("settle matched record success",
-		logx.Field("matchSubId", record.MatchSubId),
-		logx.Field("takerUid", taker.Uid),
-		logx.Field("makerUid", maker.Uid),
-		logx.Field("baseAmount", record.BaseAmount),
-		logx.Field("quoteAmount", record.QuoteAmount))
-
-	return nil
+	return []interface{}{
+		takerBalanceKey,          // offset + 1
+		makerBalanceKey,          // offset + 2
+		takerOpenOrdersKey,       // offset + 3
+		makerOpenOrdersKey,       // offset + 4
+		idempotentKey,            // offset + 5
+		takerFrozenField,         // offset + 6
+		takerAvailField,          // offset + 7
+		takerFrozenDeduct,        // offset + 8
+		takerAvailAdd,            // offset + 9
+		makerFrozenField,         // offset + 10
+		makerAvailField,          // offset + 11
+		makerFrozenDeduct,        // offset + 12
+		makerAvailAdd,            // offset + 13
+		taker.OrderId,            // offset + 14
+		int32(taker.OrderStatus), // offset + 15
+		maker.OrderId,            // offset + 16
+		int32(maker.OrderStatus), // offset + 17
+		3600 * 24,                // offset + 18
+	}, nil
 }
 
 func NewHandleMatchResultLogic(svcCtx *svc.ServiceContext) *HandleMatchResultLogic {
