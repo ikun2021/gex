@@ -24,5 +24,5 @@ func NewGetUserAssetByCoinLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 
 // 获取用户指定币种的资产
 func (l *GetUserAssetByCoinLogic) GetUserAssetByCoin(in *pb.GetUserAssetReq) (*pb.GetUserAssetResp, error) {
-
+	return nil, nil
 }

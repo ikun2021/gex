@@ -3,8 +3,6 @@ package accountservicelogic
 import (
 	"context"
 	"github.com/ikun2021/gex/common/errs"
-	"github.com/ikun2021/gex/common/proto/define"
-	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/luxun9527/zlog"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
@@ -42,26 +40,5 @@ func (l *GetUserAssetListLogic) GetUserAssetList(in *pb.GetUserAssetListReq) (*p
 
 	assets := make([]*pb.Asset, 0, len(result))
 
-	for _, v := range result {
-		prec := int32(utils.MaxPrec)
-		coinInfo, ok := l.svcCtx.Coins.Load(v.CoinName)
-		if ok {
-			info, ok := coinInfo.(*define.CoinInfo)
-			if ok {
-				prec = info.Prec
-			}
-		}
-
-		a := &pb.Asset{
-			Id:           v.ID,
-			UserId:       v.UserID,
-			Username:     v.Username,
-			CoinId:       v.CoinID,
-			CoinName:     v.CoinName,
-			AvailableQty: utils.PrecCut(v.AvailableQty, prec),
-			FrozenQty:    utils.PrecCut(v.FrozenQty, prec),
-		}
-		assets = append(assets, a)
-	}
 	return &pb.GetUserAssetListResp{AssetList: assets}, nil
 }

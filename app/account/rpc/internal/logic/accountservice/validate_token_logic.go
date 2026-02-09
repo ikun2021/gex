@@ -36,12 +36,12 @@ func (l *ValidateTokenLogic) ValidateToken(in *pb.ValidateTokenReq) (*pb.Validat
 	}
 
 	tokenMd5 := strutil.Md5(in.Token)
-	existed, err := l.svcCtx.RedisClient.ExistsCtx(l.ctx, define.AccountToken.WithParams(tokenMd5))
+	existed, err := l.svcCtx.RedisCli.Exists(context.Background(), define.AccountToken.WithParams(tokenMd5)).Result()
 	if err != nil {
 		logx.Errorw("get redis key failed", logger.ErrorField(err))
 		return nil, errs.RedisErr
 	}
-	if !existed {
+	if existed == 0 {
 		return nil, errs.TokenValidateFailed
 	}
 	return &pb.ValidateTokenResp{

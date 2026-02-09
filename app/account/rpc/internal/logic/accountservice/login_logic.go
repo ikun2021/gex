@@ -58,7 +58,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 		return nil, err
 	}
 	tokenMd5 := strutil.Md5(token)
-	if err := l.svcCtx.RedisCli.Set(context.Background(), define.AccountToken.WithParams(tokenMd5), "", 3600*24); err != nil {
+	if err := l.svcCtx.RedisCli.Set(context.Background(), define.AccountToken.WithParams(tokenMd5), "", 3600*24).Err(); err != nil {
 		logx.Errorw("set token failed", logger.ErrorField(err))
 		return nil, err
 	}

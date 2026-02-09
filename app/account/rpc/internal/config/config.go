@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/pkg/etcd"
 	commongorm "github.com/ikun2021/gex/common/pkg/gorm"
 	"github.com/ikun2021/gex/common/pkg/pulsar"
@@ -15,5 +16,7 @@ type Config struct {
 	LoggerConfig     logger.Config
 	PulsarConfig     pulsar.PulsarConfig
 	RedisConf        redis.RedisConf
+	Symbol           []models.Symbol
+	Coin             []models.Coin
 	SymbolEtcdConfig etcd.EtcdConfig
 }

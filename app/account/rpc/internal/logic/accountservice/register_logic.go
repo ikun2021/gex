@@ -31,7 +31,6 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 // 注册
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
-	// todo: add your logic here and delete this line
 	user := &model.User{
 		Username:    in.Username,
 		Password:    utils.BcryptHash(in.Password),

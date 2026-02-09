@@ -4,7 +4,8 @@ import (
 	"flag"
 	"github.com/ikun2021/gex/app/account/rpc/internal/config"
 	"github.com/ikun2021/gex/app/account/rpc/internal/consumer"
-	"github.com/ikun2021/gex/app/account/rpc/internal/server"
+	accountservice "github.com/ikun2021/gex/app/account/rpc/internal/server/accountservice"
+	orderservice "github.com/ikun2021/gex/app/account/rpc/internal/server/orderservice"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
 	logger "github.com/luxun9527/zlog"
@@ -27,7 +28,8 @@ func main() {
 	ctx := svc.NewServiceContext(c)
 	consumer.InitConsumer(ctx)
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
-		pb.RegisterAccountServiceServer(grpcServer, server.NewAccountServiceServer(ctx))
+		pb.RegisterAccountServiceServer(grpcServer, accountservice.NewAccountServiceServer(ctx))
+		pb.RegisterOrderServiceServer(grpcServer, orderservice.NewOrderServiceServer(ctx))
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)
 		}

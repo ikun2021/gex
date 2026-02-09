@@ -7,8 +7,6 @@ import (
 	"github.com/ikun2021/gex/app/account/rpc/pb"
 	"github.com/ikun2021/gex/common/errs"
 	"github.com/ikun2021/gex/common/proto/define"
-	logger "github.com/luxun9527/zlog"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -33,8 +31,8 @@ func (l *LoginOutLogic) LoginOut(in *pb.LoginOutReq) (*pb.Empty, error) {
 		return nil, errs.TokenValidateFailed
 	}
 	tokenMd5 := strutil.Md5(in.Token)
-	if _, err := l.svcCtx.RedisClient.DelCtx(l.ctx, define.AccountToken.WithParams(tokenMd5)); err != nil {
-		logx.Errorw("redis del token failed", logger.ErrorField(err))
+	if err := l.svcCtx.RedisCli.Del(context.Background(), define.AccountToken.WithParams(tokenMd5)).Err(); err != nil {
+		logx.Errorf("redis del token failed %v", err)
 		return nil, err
 	}
 
