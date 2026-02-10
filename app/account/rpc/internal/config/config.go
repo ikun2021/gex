@@ -2,7 +2,6 @@ package config
 
 import (
 	"github.com/ikun2021/gex/common/models"
-	"github.com/ikun2021/gex/common/pkg/etcd"
 	commongorm "github.com/ikun2021/gex/common/pkg/gorm"
 	"github.com/ikun2021/gex/common/pkg/pulsar"
 	logger "github.com/luxun9527/zlog"
@@ -12,11 +11,10 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	GormConf         commongorm.GormConf
-	LoggerConfig     logger.Config
-	PulsarConfig     pulsar.PulsarConfig
-	RedisConf        redis.RedisConf
-	Symbol           []models.Symbol
-	Coin             []models.Coin
-	SymbolEtcdConfig etcd.EtcdConfig
+	GormConf     commongorm.GormConf
+	LoggerConfig logger.Config
+	PulsarConfig pulsar.PulsarConfig
+	RedisConf    redis.RedisConf
+	Symbol       []models.Symbol
+	Coin         []models.Coin
 }

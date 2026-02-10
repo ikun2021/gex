@@ -336,13 +336,10 @@ func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.Accepte
 
 func (l *HandleMatchResultLogic) getCoinName(coinId int32) string {
 	name := ""
-	l.svcCtx.Coins.Range(func(key, value any) bool {
-		coin := value.(*define.CoinInfo)
-		if coin.CoinID == coinId {
-			name = coin.CoinName
-			return false
+	for _, v := range l.svcCtx.Config.Coin {
+		if v.Id == coinId {
+			return v.Name
 		}
-		return true
-	})
+	}
 	return name
 }
