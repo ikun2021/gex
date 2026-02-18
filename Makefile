@@ -8,7 +8,8 @@ enum:
 matchmq:
 	#--go_out指定的路径和option go_package = "trade/common/proto/mq/match;proto"; 指定的路径一起决定文件生成的位置 这个路径trade/common/proto/mq/match也是别人导入时用到的路径。
 	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
-
+matchrpc:
+	goctl rpc  protoc -I./ app/match/pb/match.proto --go_out=app/match --go-grpc_out=app/match  --zrpc_out=app/match -style=go_zero  -home=template
 matchmodel:
 	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/match/rpc/internal/dao/query -fieldMap="decimal:string;tinyint:int32;int:int64"
 

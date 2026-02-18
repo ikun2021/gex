@@ -207,7 +207,7 @@ func (d *DepthHandler) Handle(message pulsar.Message) {
 	if err := proto.Unmarshal(message.Payload(), &m); err != nil {
 		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 		if err := d.consumer.Ack(message); err != nil {
-			logx.Errorw("consumer message failed", logger.ErrorField(err))
+			logx.Errorw("handler message failed", logger.ErrorField(err))
 		}
 		return
 	}

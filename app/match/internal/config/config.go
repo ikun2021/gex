@@ -10,7 +10,8 @@ import (
 )
 
 type Config struct {
-	PulsarConfig     pulsar.PulsarConfig
+	PulsarConfig pulsar.PulsarConfig
+	zrpc.RpcServerConf
 	LoggerConfig     logger.Config
 	Symbol           []models.Symbol
 	Coin             []models.Coin

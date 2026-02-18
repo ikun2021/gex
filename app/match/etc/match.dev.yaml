@@ -1,6 +1,13 @@
-Name: match
-ListenOn: 0.0.0.0:20003
-Timeout: 5000
+Name: account.rpc
+ListenOn: 0.0.0.0:20007
+Timeout: 1000000
+Mode: dev
+Etcd:
+  Hosts:
+    - 192.168.2.159:2379
+  Key: match.rpc
+
+
 Symbol:
   - Name: IKUN_USDT
     Id: 1

@@ -21,14 +21,14 @@ func InitConsumer(sc *svc.ServiceContext) {
 			for {
 				message, err := c.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
+					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
 				var m matchMq.MatchInput
 				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
 					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 					if err := c.Ack(message); err != nil {
-						logx.Errorw("consumer message failed", logger.ErrorField(err))
+						logx.Errorw("handler message failed", logger.ErrorField(err))
 					}
 					continue
 				}

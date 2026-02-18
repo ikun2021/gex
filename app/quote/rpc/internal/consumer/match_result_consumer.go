@@ -30,14 +30,14 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
-				logx.Severef("init consumer failed %v", err)
+				logx.Severef("init handler failed %v", err)
 			}
 			// 1. 定义缓冲区 (在循环外)
 			tickHandle := handler.NewTickHandle(sc, consumer, v)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
+					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
 				tickHandle.Handle(message)
@@ -53,19 +53,19 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Shared,
 			})
 			if err != nil {
-				logx.Severef("init consumer failed %v", err)
+				logx.Severef("init handler failed %v", err)
 			}
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
+					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
 				var m matchMq.MatchOutput
 				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
 					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 					if err := consumer.Ack(message); err != nil {
-						logx.Errorw("consumer message failed", logger.ErrorField(err))
+						logx.Errorw("handler message failed", logger.ErrorField(err))
 					}
 					continue
 				}
@@ -97,13 +97,13 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
-				logx.Severef("init consumer failed %v", err)
+				logx.Severef("init handler failed %v", err)
 			}
 			klineHandler := handler.NewKlineHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
+					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
 
@@ -120,13 +120,13 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Shared,
 			})
 			if err != nil {
-				logx.Severef("init consumer failed %v", err)
+				logx.Severef("init handler failed %v", err)
 			}
 			depthHandler := handler.NewDepthHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("consumer message match result failed", logger.ErrorField(err))
+					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
 				depthHandler.Handle(message)

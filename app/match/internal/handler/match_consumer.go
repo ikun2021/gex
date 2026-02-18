@@ -1,4 +1,4 @@
-package consumer
+package handler
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/ikun2021/gex/app/match/internal/svc"
 	"github.com/ikun2021/gex/common/defines"
 	"github.com/ikun2021/gex/common/models"
+	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
@@ -16,27 +17,41 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func InitMatchConsumer(sc *svc.ServiceContext) {
+var (
+	Handlers = map[string]*engine.MatchEngine{}
+)
+
+func InitMatchHandler(sc *svc.ServiceContext) {
 	ctx := context.Background()
 
 	for _, v := range sc.Config.Symbol {
 		go func(symbol models.Symbol) {
+			inputTopic := pulsarConfig.Topic{
+				Tenant:    pulsarConfig.PublicTenant,
+				Namespace: pulsarConfig.GexNamespace,
+				Topic:     defines.MatchTopicInputPrefix + v.Name,
+			}
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:            defines.MatchTopicInputPrefix + symbol.Name,
-				Name:             "match_" + symbol.Name,
+				Topic:            inputTopic.BuildTopic(),
 				SubscriptionName: "match_" + symbol.Name,
 			})
 			if err != nil {
-				logx.Severef("init match consumer error:%v", err)
+				logx.Severef("init match handler error:%v", err)
 			}
+			outputTopic := pulsarConfig.Topic{
+				Tenant:    pulsarConfig.PublicTenant,
+				Namespace: pulsarConfig.GexNamespace,
+				Topic:     defines.MatchTopicOutputPrefix + v.Name,
+			}
+			logx.Debugf("start match handler output topic=%s", outputTopic)
 			producer, err := sc.PulsarClient.CreateProducer(pulsar.ProducerOptions{
-				Topic: defines.MatchTopicInputPrefix + symbol.Name,
+				Topic: outputTopic.BuildTopic(),
 			})
 			if err != nil {
 				logx.Severef("init pulsar producer failed %v", err)
 			}
 			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient, sc.WsClient)
-
+			Handlers[symbol.Name] = me
 			for {
 				message, err := consumer.Receive(ctx)
 				if err != nil {
@@ -49,6 +64,7 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
 					continue
 				}
+				logx.Debugf("receive match request %v", matchReq)
 
 				if me.Gte(matchReq.MessageId) {
 					logx.Slowf("current msg id %v", matchReq.MessageId)

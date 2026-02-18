@@ -77,7 +77,7 @@ func (kl *KlineHandler) Handle(msg pulsar.Message) {
 	if err := proto.Unmarshal(msg.Payload(), &m); err != nil {
 		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 		if err := kl.consumer.Ack(msg); err != nil {
-			logx.Errorw("consumer message failed", logger.ErrorField(err))
+			logx.Errorw("handler message failed", logger.ErrorField(err))
 		}
 		return
 	}
@@ -224,7 +224,7 @@ func (kl *KlineHandler) store() {
 
 					if klineData.MessageID != nil {
 						if err := kl.consumer.AckIDCumulative(klineData.MessageID); err != nil {
-							logx.Errorw("consumer message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
+							logx.Errorw("handler message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
 							return err
 						}
 					}

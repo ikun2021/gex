@@ -40,7 +40,7 @@ type MatchEngine struct {
 	storeChan              chan *SnapshotData
 	version                int64
 	currentPulsarMessageId pulsar.MessageID
-	depthHandler           *DepthHandler
+	DepthHandler           *DepthHandler
 	wsClient               ws.ProxyClient
 }
 
@@ -556,7 +556,7 @@ LOOP:
 			price: record.Price,
 			qty:   record.Qty,
 		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
 	}
 	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
 	if len(matchMsg.MatchResult.MatchedRecords) > 0 {
@@ -690,14 +690,14 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *InputMessage) {
 			price: takerOrder.Price,
 			qty:   takerOrder.UnfilledBaseAmount,
 		}
-		m.depthHandler.updateDepth(p, enum.Side_Buy, Add, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Buy, Add, 0)
 	} //更新深度数据
 	for _, record := range matchMsg.MatchResult.MatchedRecords {
 		p := &position{
 			price: record.Price,
 			qty:   record.Qty,
 		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
 	}
 	//更新深度数据
 
@@ -821,7 +821,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 			price: takerOrder.Price,
 			qty:   takerOrder.UnfilledBaseAmount,
 		}
-		m.depthHandler.updateDepth(p, enum.Side_Sell, Add, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Add, 0)
 
 	}
 	//更新深度数据
@@ -909,16 +909,16 @@ func (m *MatchEngine) recover() {
 		logx.Errorf("match engine recover unmarshal failed symbol=%v err=%v", m.symbolConf.Name, err)
 		return
 	}
-	m.depthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
+	m.DepthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
 	for _, v := range data.Asks {
-		m.depthHandler.updateDepth(&position{
+		m.DepthHandler.updateDepth(&position{
 			price: v.Price,
 			qty:   v.UnfilledBaseAmount,
 		}, enum.Side_Sell, Add, v.MessageId)
 		m.asks.add(v)
 	}
 	for _, v := range data.Bids {
-		m.depthHandler.updateDepth(&position{
+		m.DepthHandler.updateDepth(&position{
 			price: v.Price,
 			qty:   v.UnfilledBaseAmount,
 		}, enum.Side_Buy, Delete, v.MessageId)
@@ -962,7 +962,7 @@ func (m *MatchEngine) handle(order *InputMessage) {
 		//订单簿删除订单
 		m.cancelOrder(order)
 		//更新盘口深度
-		m.depthHandler.updateDepth(&position{
+		m.DepthHandler.updateDepth(&position{
 			price: order.Price,
 			qty:   order.UnfilledBaseAmount,
 		}, order.Side, Delete, 0)
@@ -999,7 +999,7 @@ func (m *MatchEngine) handle(order *InputMessage) {
 
 				m.addOrder(order)
 				//更新盘口深度
-				m.depthHandler.updateDepth(&position{
+				m.DepthHandler.updateDepth(&position{
 					price: order.Price,
 					qty:   order.UnfilledBaseAmount,
 				}, order.Side, Add, 0)
@@ -1031,7 +1031,7 @@ func (m *MatchEngine) handle(order *InputMessage) {
 				m.addOrder(order)
 				//更新盘口深度
 				//更新盘口深度
-				m.depthHandler.updateDepth(&position{
+				m.DepthHandler.updateDepth(&position{
 					price: order.Price,
 					qty:   order.UnfilledBaseAmount,
 				}, order.Side, Add, 0)

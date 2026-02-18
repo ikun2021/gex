@@ -2,6 +2,9 @@ package engine
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	rbt "github.com/emirpasic/gods/trees/redblacktree"
 	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/enum"
@@ -13,8 +16,6 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
-	"sync"
-	"time"
 )
 
 type DepthHandler struct {
@@ -211,7 +212,7 @@ func (d *DepthHandler) updateDepth(p *position, side enum.Side, op opType, versi
 }
 
 // 获取实时深度
-func (d *DepthHandler) getDepth(level int32) DepthData {
+func (d *DepthHandler) GetDepth(level int32) DepthData {
 	d.plock.RLock()
 	defer d.plock.RUnlock()
 	var depthData DepthData
