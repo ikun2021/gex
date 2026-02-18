@@ -1,0 +1,1006 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/account/v1/add_user_asset": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "新增用户资产",
+        "operationId": "accountAddUserAsset",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "coin_name",
+                "qty"
+              ],
+              "properties": {
+                "coin_name": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/get_captcha": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取验证码",
+        "operationId": "accountGetCaptcha",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "captch_length": {
+                  "type": "integer"
+                },
+                "captcha_id": {
+                  "type": "string"
+                },
+                "captcha_pic": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/get_user_asset_list": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取用户所有资产",
+        "operationId": "accountGetUserAssetList",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "asset_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "coin_name",
+                      "coin_id",
+                      "available_qty",
+                      "frozen_qty"
+                    ],
+                    "properties": {
+                      "available_qty": {
+                        "description": "可用数量",
+                        "type": "string"
+                      },
+                      "coin_id": {
+                        "description": "币种id",
+                        "type": "integer"
+                      },
+                      "coin_name": {
+                        "description": "币种名称",
+                        "type": "string"
+                      },
+                      "frozen_qty": {
+                        "description": "冻结数量",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "id",
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/login": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "登录",
+        "operationId": "accountLogin",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "username",
+                "password",
+                "captcha",
+                "captcha_id"
+              ],
+              "properties": {
+                "captcha": {
+                  "type": "string"
+                },
+                "captcha_id": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "expire_time": {
+                  "description": "到期时间",
+                  "type": "integer"
+                },
+                "token": {
+                  "description": "token",
+                  "type": "string"
+                },
+                "uid": {
+                  "description": "uid",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "用户名",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/register": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "注册",
+        "operationId": "accountRegister",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "username",
+                "password",
+                "confirm_password"
+              ],
+              "properties": {
+                "captcha": {
+                  "description": "验证",
+                  "type": "integer"
+                },
+                "confirm_password": {
+                  "description": "确认密码",
+                  "type": "string"
+                },
+                "password": {
+                  "description": "密码",
+                  "type": "string"
+                },
+                "phone_number": {
+                  "description": "手机号",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "用户名",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/validate_token": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "验证token",
+        "operationId": "accountValidateToken",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "token"
+              ],
+              "properties": {
+                "token": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user_info": {
+                  "type": "object",
+                  "required": [
+                    "uid",
+                    "username"
+                  ],
+                  "properties": {
+                    "uid": {
+                      "type": "string"
+                    },
+                    "username": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order/v1/cancel_order": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "取消订单",
+        "operationId": "orderCancelOrder",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "id",
+                "symbol_name"
+              ],
+              "properties": {
+                "id": {
+                  "description": "订单id",
+                  "type": "string"
+                },
+                "symbol_name": {
+                  "description": "交易对名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/order/v1/create_order": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "下单",
+        "operationId": "orderCreateOrder",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "symbol_name",
+                "price",
+                "base_amount",
+                "quote_amount",
+                "side",
+                "order_type"
+              ],
+              "properties": {
+                "base_amount": {
+                  "description": "数量",
+                  "type": "string"
+                },
+                "order_type": {
+                  "description": "订单类型",
+                  "type": "integer"
+                },
+                "price": {
+                  "description": "价格",
+                  "type": "string"
+                },
+                "quote_amount": {
+                  "description": "金额",
+                  "type": "string"
+                },
+                "side": {
+                  "description": "方向",
+                  "type": "integer"
+                },
+                "symbol_name": {
+                  "description": "交易对名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/order/v1/get_order_list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取用户订单列表",
+        "operationId": "orderGetOrderList",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "status_list",
+                "symbol_name",
+                "page_size",
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "page_size": {
+                  "description": "分页偏远量",
+                  "type": "integer"
+                },
+                "status_list": {
+                  "description": "状态",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "symbol_name": {
+                  "description": "状态",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "order_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "order_id",
+                      "user_id",
+                      "symbol_name",
+                      "price",
+                      "base_amount",
+                      "quote_amount",
+                      "side",
+                      "status",
+                      "order_type",
+                      "filled_base_amount",
+                      "filled_quote_amount",
+                      "filled_avg_price",
+                      "created_at"
+                    ],
+                    "properties": {
+                      "base_amount": {
+                        "description": "数量",
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "创建时间",
+                        "type": "integer"
+                      },
+                      "filled_avg_price": {
+                        "description": "成交均价",
+                        "type": "string"
+                      },
+                      "filled_base_amount": {
+                        "description": "成交数量",
+                        "type": "string"
+                      },
+                      "filled_quote_amount": {
+                        "description": "成交金额",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "id",
+                        "type": "string"
+                      },
+                      "order_id": {
+                        "description": "订单id",
+                        "type": "string"
+                      },
+                      "order_type": {
+                        "description": "订单类型",
+                        "type": "integer"
+                      },
+                      "price": {
+                        "description": "价格",
+                        "type": "string"
+                      },
+                      "quote_amount": {
+                        "description": "金额",
+                        "type": "string"
+                      },
+                      "side": {
+                        "description": "方向",
+                        "type": "integer"
+                      },
+                      "status": {
+                        "description": "状态",
+                        "type": "integer"
+                      },
+                      "symbol_name": {
+                        "description": "交易对名",
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "description": "用户id",
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotes/v1/get_depth_list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取深度",
+        "operationId": "quoteGetDepthList",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "symbol",
+                "level"
+              ],
+              "properties": {
+                "level": {
+                  "description": "档位",
+                  "type": "integer"
+                },
+                "symbol": {
+                  "description": "交易对",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "asks": {
+                  "description": "卖盘",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "qty",
+                      "price",
+                      "amount"
+                    ],
+                    "properties": {
+                      "amount": {
+                        "description": "金额",
+                        "type": "string"
+                      },
+                      "price": {
+                        "description": "价格",
+                        "type": "string"
+                      },
+                      "qty": {
+                        "description": "数量",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "bids": {
+                  "description": "买盘",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "qty",
+                      "price",
+                      "amount"
+                    ],
+                    "properties": {
+                      "amount": {
+                        "description": "金额",
+                        "type": "string"
+                      },
+                      "price": {
+                        "description": "价格",
+                        "type": "string"
+                      },
+                      "qty": {
+                        "description": "数量",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "version": {
+                  "description": "当前版本号",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotes/v1/get_kline_list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取k线",
+        "operationId": "quoteGetKlineList",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "start_time",
+                "end_time",
+                "kline_type",
+                "symbol"
+              ],
+              "properties": {
+                "end_time": {
+                  "description": "结束时间",
+                  "type": "integer"
+                },
+                "kline_type": {
+                  "description": "k线类型",
+                  "type": "integer"
+                },
+                "start_time": {
+                  "description": "开始时间 秒时间戳",
+                  "type": "integer"
+                },
+                "symbol": {
+                  "description": "交易对",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "kline_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "open",
+                      "high",
+                      "low",
+                      "close",
+                      "amount",
+                      "volume",
+                      "start_time",
+                      "end_time",
+                      "price_range",
+                      "symbol"
+                    ],
+                    "properties": {
+                      "amount": {
+                        "description": "成交量",
+                        "type": "string"
+                      },
+                      "close": {
+                        "description": "收",
+                        "type": "string"
+                      },
+                      "end_time": {
+                        "description": "结束时间",
+                        "type": "integer"
+                      },
+                      "high": {
+                        "description": "高",
+                        "type": "string"
+                      },
+                      "low": {
+                        "description": "低",
+                        "type": "string"
+                      },
+                      "open": {
+                        "description": "开",
+                        "type": "string"
+                      },
+                      "price_range": {
+                        "description": "涨跌幅",
+                        "type": "string"
+                      },
+                      "start_time": {
+                        "description": "开始时间",
+                        "type": "integer"
+                      },
+                      "symbol": {
+                        "description": "交易对",
+                        "type": "string"
+                      },
+                      "volume": {
+                        "description": "成交额",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotes/v1/get_tick_list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取tick成交",
+        "operationId": "quoteGetTickList",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "symbol"
+              ],
+              "properties": {
+                "limit": {
+                  "description": "获取多少条",
+                  "type": "integer"
+                },
+                "symbol": {
+                  "description": "交易对",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tick_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "price",
+                      "qty",
+                      "amount",
+                      "timestamp",
+                      "symbol",
+                      "taker_is_buyer"
+                    ],
+                    "properties": {
+                      "amount": {
+                        "description": "金额",
+                        "type": "string"
+                      },
+                      "price": {
+                        "description": "价格",
+                        "type": "string"
+                      },
+                      "qty": {
+                        "description": "数量",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "type": "string"
+                      },
+                      "taker_is_buyer": {
+                        "type": "boolean"
+                      },
+                      "timestamp": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotes/v1/get_ticker_list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取ticker",
+        "operationId": "quoteGetTickerList",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "symbol"
+              ],
+              "properties": {
+                "symbol": {
+                  "description": "交易对",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "ticker_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "last_price",
+                      "high",
+                      "low",
+                      "amount",
+                      "volume",
+                      "price_range",
+                      "last24_price",
+                      "symbol"
+                    ],
+                    "properties": {
+                      "amount": {
+                        "description": "成交量",
+                        "type": "string"
+                      },
+                      "high": {
+                        "description": "高",
+                        "type": "string"
+                      },
+                      "last24_price": {
+                        "description": "24小时前的价格",
+                        "type": "string"
+                      },
+                      "last_price": {
+                        "description": "最新价",
+                        "type": "string"
+                      },
+                      "low": {
+                        "description": "低",
+                        "type": "string"
+                      },
+                      "price_range": {
+                        "description": "涨跌幅",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "description": "交易对",
+                        "type": "string"
+                      },
+                      "volume": {
+                        "description": "成交额",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-date": "2026-02-15 00:06:51",
+  "x-description": "This is a goctl generated swagger file.",
+  "x-github": "https://github.com/zeromicro/go-zero",
+  "x-go-zero-doc": "https://go-zero.dev/",
+  "x-goctl-version": "1.9.2"
+}

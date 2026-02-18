@@ -5,6 +5,7 @@ import (
 	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
 	"github.com/ikun2021/gex/app/gateway/internal/config"
 	"github.com/ikun2021/gex/app/gateway/internal/middleware"
+	"github.com/ikun2021/gex/common/errs"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
@@ -24,6 +25,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	logx.DisableStat()
 	cli := accountservice.NewAccountService(zrpc.MustNewClient(c.AccountRpcConf))
 	orderRpc := orderservice.NewOrderService(zrpc.MustNewClient(c.AccountRpcConf))
+	translator, err := errs.NewTranslator(c.LangPath)
+	if err != nil {
+		logx.Severef("init translator failed %v", err)
+	}
+	errs.SetDefaultTranslator(translator)
 	return &ServiceContext{
 		Config:     c,
 		AccountRpc: cli,

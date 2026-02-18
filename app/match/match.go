@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/ikun2021/gex/app/match/internal/config"
 	"github.com/ikun2021/gex/app/match/internal/consumer"
 	"github.com/ikun2021/gex/app/match/internal/svc"
@@ -10,7 +11,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-var configFile = flag.String("f", "app/match/rpc/etc/match.yaml", "the config file")
+var configFile = flag.String("f", "app/match/etc/match.dev.yaml", "the config file")
 
 func main() {
 	flag.Parse()
@@ -22,6 +23,6 @@ func main() {
 	consumer.InitMatchConsumer(ctx)
 	logx.SetLevel(logx.DebugLevel)
 	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))
-
+	logx.Infof("start match service ")
 	select {}
 }

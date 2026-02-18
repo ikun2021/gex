@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+
 	"github.com/ikun2021/gex/app/account/rpc/internal/config"
 	"github.com/ikun2021/gex/app/account/rpc/internal/consumer"
+	"github.com/ikun2021/gex/app/account/rpc/internal/logic"
 	accountservice "github.com/ikun2021/gex/app/account/rpc/internal/server/accountservice"
 	orderservice "github.com/ikun2021/gex/app/account/rpc/internal/server/orderservice"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
@@ -34,6 +36,7 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	logic.StartRelayer(ctx.RedisCli, ctx.MatchProducers)
 	defer s.Stop()
 	logx.SetLevel(logx.DebugLevel)
 	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))

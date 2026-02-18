@@ -9,6 +9,7 @@ message MatchInput{
     CancelOrderEvent cancel_order = 2;
   }
   int64 message_id = 3;
+  string symbol_name = 4;
 }
 
 

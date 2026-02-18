@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	logger "github.com/luxun9527/zlog"
 	"strings"
+
+	logger "github.com/luxun9527/zlog"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
-	"github.com/ikun2021/gex/common/errs"
 	"github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
@@ -145,9 +145,9 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	orderDataStr := string(dataBytes)
 
 	// 5. 准备 Lua 脚本参数
-	balanceKey := fmt.Sprintf("balance:%d", in.UserId) // KEYS[1]
-	streamKey := StreamKeyMQOutbox                     // KEYS[2]
-	orderKey := fmt.Sprintf("order:%s", orderId)       // KEYS[3]
+	balanceKey := fmt.Sprintf("balance:%d", in.UserId)                  // KEYS[1]
+	streamKey := fmt.Sprintf("%s_%s", StreamKeyMQOutbox, in.SymbolName) // KEYS[2]
+	orderKey := fmt.Sprintf("order:%s", orderId)                        // KEYS[3]
 
 	availField := freezeCurrency              // ARGV[1]
 	frozenField := freezeCurrency + "_frozen" // ARGV[2]
@@ -168,11 +168,13 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	if err != nil {
 		logx.Errorw("Execute redis lua failed", logger.ErrorField(err))
 		// 区分 Redis 系统错误和业务错误，这里统一返回系统忙
-		return nil, errs.CastToDtmError(errs.RedisErr)
+		return nil, err
+
 	}
 
 	// 脚本返回 0 表示余额不足
 	if cast.ToInt64(res) == 0 {
+		logx.Debugf("User %d has insufficient balance", in.UserId)
 		return nil, errors.New("insufficient balance")
 	}
 

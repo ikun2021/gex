@@ -10,4 +10,5 @@ type Config struct {
 	rest.RestConf
 	LoggerConfig   zlog.Config
 	AccountRpcConf zrpc.RpcClientConf
+	LangPath       string
 }

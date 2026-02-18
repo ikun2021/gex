@@ -1,14 +1,15 @@
-package translator
+package errs
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"go.uber.org/atomic"
 	"golang.org/x/text/language"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (

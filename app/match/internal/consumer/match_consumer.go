@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/match/internal/engine"
 	"github.com/ikun2021/gex/app/match/internal/svc"
@@ -21,7 +22,9 @@ func InitMatchConsumer(sc *svc.ServiceContext) {
 	for _, v := range sc.Config.Symbol {
 		go func(symbol models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic: defines.MatchTopicInputPrefix + symbol.Name,
+				Topic:            defines.MatchTopicInputPrefix + symbol.Name,
+				Name:             "match_" + symbol.Name,
+				SubscriptionName: "match_" + symbol.Name,
 			})
 			if err != nil {
 				logx.Severef("init match consumer error:%v", err)

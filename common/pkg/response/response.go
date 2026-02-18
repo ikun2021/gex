@@ -1,13 +1,13 @@
 package response
 
 import (
+	"net/http"
+
 	"github.com/ikun2021/gex/common/errs"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	codes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
 )
 
 type Body struct {
@@ -27,9 +27,7 @@ func Response(w http.ResponseWriter, r *http.Request, resp interface{}, err erro
 		}
 		body.Code = int(e.Code())
 		code := e.Code()
-		if body.Code < int(errs.CommonCodeInit) {
-			code = codes.Code(errs.DefaultCode)
-		}
+		
 		body.Msg = errs.Code(code).Translate(lang)
 
 		if e.Message() != "" && int(e.Code()) > int(errs.CommonCodeInit) {

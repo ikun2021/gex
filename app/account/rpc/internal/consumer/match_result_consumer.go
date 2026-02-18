@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
@@ -34,7 +35,7 @@ func InitConsumer(sc *svc.ServiceContext) {
 
 				switch r := m.Event.(type) {
 				case *matchMq.MatchInput_CreateOrder:
-
+					logx.Debugf("match result create order %s", r.CreateOrder)
 				case *matchMq.MatchInput_CancelOrder:
 
 					//解冻用户资产
