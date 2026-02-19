@@ -35,7 +35,7 @@ matchmq:
 	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
 
 gapi:
-	goctl api go -api=app/gateway/api/desc/gateway.api -dir=app/gateway -style=go_zero  -home=template
+	goctl api go --api=app/gateway/desc/gateway.api -dir=app/gateway -style=go_zero  -home=template
 	goctl api swagger -api .\app\gateway\desc\gateway.api -dir ./doc
 
 

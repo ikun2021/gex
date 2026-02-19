@@ -5,6 +5,7 @@ import (
 	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
 	"github.com/ikun2021/gex/app/gateway/internal/config"
 	"github.com/ikun2021/gex/app/gateway/internal/middleware"
+	"github.com/ikun2021/gex/app/match/matchservice"
 	"github.com/ikun2021/gex/common/errs"
 	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -17,6 +18,7 @@ type ServiceContext struct {
 	Auth       rest.Middleware
 	AccountRpc accountservice.AccountService
 	OrderRpc   orderservice.OrderService
+	MatchRpc   matchservice.MatchService
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -25,6 +27,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	logx.DisableStat()
 	cli := accountservice.NewAccountService(zrpc.MustNewClient(c.AccountRpcConf))
 	orderRpc := orderservice.NewOrderService(zrpc.MustNewClient(c.AccountRpcConf))
+	matchRpc := matchservice.NewMatchService(zrpc.MustNewClient(c.MatchRpcConf))
 	translator, err := errs.NewTranslator(c.LangPath)
 	if err != nil {
 		logx.Severef("init translator failed %v", err)
@@ -34,6 +37,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Config:     c,
 		AccountRpc: cli,
 		OrderRpc:   orderRpc,
+		MatchRpc:   matchRpc,
 		Auth:       middleware.NewAuthMiddleware().Handle,
 	}
 }

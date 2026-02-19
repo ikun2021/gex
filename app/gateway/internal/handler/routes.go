@@ -93,6 +93,17 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
+				Method:  http.MethodPost,
+				Path:    "/get_depth",
+				Handler: quote.GetDepthHandler(serverCtx),
+			},
+		},
+		rest.WithPrefix("/quotes/v1"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
 				// 获取深度
 				Method:  http.MethodPost,
 				Path:    "/get_depth_list",

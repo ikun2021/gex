@@ -594,6 +594,100 @@
         }
       }
     },
+    "/quotes/v1/get_depth": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "GetDepth",
+        "operationId": "quoteGetDepth",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "symbol",
+                "level"
+              ],
+              "properties": {
+                "level": {
+                  "type": "integer"
+                },
+                "symbol": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "asks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "base_amount",
+                      "price",
+                      "quote_amount"
+                    ],
+                    "properties": {
+                      "base_amount": {
+                        "type": "string"
+                      },
+                      "price": {
+                        "type": "string"
+                      },
+                      "quote_amount": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "bids": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "base_amount",
+                      "price",
+                      "quote_amount"
+                    ],
+                    "properties": {
+                      "base_amount": {
+                        "type": "string"
+                      },
+                      "price": {
+                        "type": "string"
+                      },
+                      "quote_amount": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "version": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/quotes/v1/get_depth_list": {
       "post": {
         "consumes": [
@@ -998,7 +1092,7 @@
       }
     }
   },
-  "x-date": "2026-02-15 00:06:51",
+  "x-date": "2026-02-19 23:09:05",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

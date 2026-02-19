@@ -71,7 +71,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 					continue
 				}
 
-				logx.Infow("receive message failed", logx.Field("data", &matchReq))
+				logx.Infow("receive message", logx.Field("data", &matchReq))
 				var inputMessage *engine.InputMessage
 				switch event := matchReq.Event.(type) {
 				case *matchMq.MatchInput_CreateOrder:

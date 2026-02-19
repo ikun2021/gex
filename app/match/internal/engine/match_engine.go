@@ -907,7 +907,6 @@ func (m *MatchEngine) recover() {
 	var data SnapshotData
 	if err := json.Unmarshal([]byte(val), &data); err != nil {
 		logx.Errorf("match engine recover unmarshal failed symbol=%v err=%v", m.symbolConf.Name, err)
-		return
 	}
 	m.DepthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
 	for _, v := range data.Asks {

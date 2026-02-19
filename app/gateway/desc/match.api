@@ -1,0 +1,27 @@
+type (
+	GetDepthReq {
+		Symbol string `json:"symbol"`
+		Level  int32  `json:"level"`
+	}
+
+	MatchPosition {
+		BaseAmount  string `json:"base_amount"`
+		Price       string `json:"price"`
+		QuoteAmount string `json:"quote_amount"`
+	}
+
+	GetDepthResp {
+		Version int64            `json:"version"`
+		Asks    []*MatchPosition `json:"asks"`
+		Bids    []*MatchPosition `json:"bids"`
+	}
+)
+
+@server(
+	prefix: /quotes/v1
+	group:  quote
+)
+service gateway {
+	@handler GetDepth
+	post /get_depth (GetDepthReq) returns (GetDepthResp)
+}

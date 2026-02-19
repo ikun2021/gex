@@ -50,6 +50,17 @@ type GetDepthListResp struct {
 	Bids    []*Position `json:"bids"`    //买盘
 }
 
+type GetDepthReq struct {
+	Symbol string `json:"symbol"`
+	Level  int32  `json:"level"`
+}
+
+type GetDepthResp struct {
+	Version int64            `json:"version"`
+	Asks    []*MatchPosition `json:"asks"`
+	Bids    []*MatchPosition `json:"bids"`
+}
+
 type GetOrderListReq struct {
 	Status     []int32 `json:"status_list"` //状态
 	SymbolName string  `json:"symbol_name"` //状态
@@ -119,6 +130,12 @@ type LoginResp struct {
 	Username   string `json:"username"`    //用户名
 	Token      string `json:"token"`       //token
 	ExpireTime int64  `json:"expire_time"` //到期时间
+}
+
+type MatchPosition struct {
+	BaseAmount  string `json:"base_amount"`
+	Price       string `json:"price"`
+	QuoteAmount string `json:"quote_amount"`
 }
 
 type OrderInfo struct {

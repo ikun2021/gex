@@ -8,6 +8,13 @@ AccountRpcConf:
     Hosts:
       - 192.168.2.159:2379
     NonBlock: true
+
+MatchRpcConf:
+  etcd:
+    Key: match.rpc
+    Hosts:
+      - 192.168.2.159:2379
+    NonBlock: true
 LangPath: ./common/errs/language
 LoggerConfig:
   level: debug  #日志等级 debug info warn error
