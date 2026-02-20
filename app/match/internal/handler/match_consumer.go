@@ -51,6 +51,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 				logx.Severef("init pulsar producer failed %v", err)
 			}
 			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient, sc.WsClient)
+			me.Start()
 			Handlers[symbol.Name] = me
 			for {
 				message, err := consumer.Receive(ctx)
@@ -71,7 +72,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 					continue
 				}
 
-				logx.Infow("receive message", logx.Field("data", &matchReq))
+				logx.Infof("receive message data %v", &matchReq)
 				var inputMessage *engine.InputMessage
 				switch event := matchReq.Event.(type) {
 				case *matchMq.MatchInput_CreateOrder:

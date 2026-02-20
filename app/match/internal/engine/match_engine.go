@@ -832,7 +832,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 
 }
 
-func (m *MatchEngine) start() {
+func (m *MatchEngine) Start() {
 	ticker := time.NewTicker(time.Minute)
 	isUpdated := false
 	go func() {

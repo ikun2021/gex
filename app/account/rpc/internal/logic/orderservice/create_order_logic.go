@@ -122,7 +122,7 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 		Event: &matchMq.MatchInput_CreateOrder{
 			CreateOrder: &matchMq.CreateOrderEvent{
 				OrderId:     orderId,
-				SequenceId:  0, // 此时未定序
+				SequenceId:  seqId, // 此时未定序
 				Uid:         in.UserId,
 				Side:        in.Side,
 				Price:       price.String(),

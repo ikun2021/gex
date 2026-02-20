@@ -29,8 +29,6 @@ func main() {
 
 	handler.InitMatchHandler(ctx)
 	logx.SetLevel(logx.DebugLevel)
-	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))
-	logx.Infof("start match service ")
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterMatchServiceServer(grpcServer, server.NewMatchServiceServer(ctx))
@@ -40,7 +38,7 @@ func main() {
 		}
 	})
 	defer s.Stop()
-
+	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))
 	logx.Infof("start match service ")
 	s.Start()
 }
