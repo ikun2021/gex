@@ -1010,8 +1010,6 @@ func (m *MatchEngine) handle(order *InputMessage) {
 		//买单限价单,发送一条accepted消息
 		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_LO:
 			m.SendResult(&MatchOutputMessage{
-				MatchResult:  nil,
-				CancelResult: nil,
 				AcceptedResult: &AcceptedResult{
 					OrderId:     order.OrderID,
 					Uid:         order.Uid,
