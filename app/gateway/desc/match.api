@@ -22,6 +22,7 @@ type (
 	group:  quote
 )
 service gateway {
+	@doc "获取深度"
 	@handler GetDepth
-	post /get_depth (GetDepthReq) returns (GetDepthResp)
+	get /get_depth (GetDepthReq) returns (GetDepthResp)
 }

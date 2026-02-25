@@ -54,5 +54,5 @@ service gateway {
     post /cancel_order (CancelOrderReq) returns (Empty)
     @doc "获取用户订单列表"
     @handler GetOrderList
-    post /get_order_list (GetOrderListReq) returns (GetOrderListResp)
+    get /get_order_list (GetOrderListReq) returns (GetOrderListResp)
 }

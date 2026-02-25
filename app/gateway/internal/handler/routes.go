@@ -82,7 +82,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				// 获取用户订单列表
-				Method:  http.MethodPost,
+				Method:  http.MethodGet,
 				Path:    "/get_order_list",
 				Handler: order.GetOrderListHandler(serverCtx),
 			},
@@ -93,9 +93,22 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
-				Method:  http.MethodPost,
-				Path:    "/get_depth",
-				Handler: quote.GetDepthHandler(serverCtx),
+				// 获取k线
+				Method:  http.MethodGet,
+				Path:    "/get_kline_list",
+				Handler: quote.GetKlineListHandler(serverCtx),
+			},
+			{
+				// 获取tick成交
+				Method:  http.MethodGet,
+				Path:    "/get_tick_list",
+				Handler: quote.GetTickListHandler(serverCtx),
+			},
+			{
+				// 获取ticker
+				Method:  http.MethodGet,
+				Path:    "/get_ticker_list",
+				Handler: quote.GetTickerListHandler(serverCtx),
 			},
 		},
 		rest.WithPrefix("/quotes/v1"),
@@ -105,27 +118,9 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 		[]rest.Route{
 			{
 				// 获取深度
-				Method:  http.MethodPost,
-				Path:    "/get_depth_list",
-				Handler: quote.GetDepthListHandler(serverCtx),
-			},
-			{
-				// 获取k线
-				Method:  http.MethodPost,
-				Path:    "/get_kline_list",
-				Handler: quote.GetKlineListHandler(serverCtx),
-			},
-			{
-				// 获取tick成交
-				Method:  http.MethodPost,
-				Path:    "/get_tick_list",
-				Handler: quote.GetTickListHandler(serverCtx),
-			},
-			{
-				// 获取ticker
-				Method:  http.MethodPost,
-				Path:    "/get_ticker_list",
-				Handler: quote.GetTickerListHandler(serverCtx),
+				Method:  http.MethodGet,
+				Path:    "/get_depth",
+				Handler: quote.GetDepthHandler(serverCtx),
 			},
 		},
 		rest.WithPrefix("/quotes/v1"),

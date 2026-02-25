@@ -2,6 +2,7 @@ package errs
 
 import (
 	"errors"
+	"github.com/zeromicro/go-zero/core/logx"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,10 @@ func NewTranslator(langFilePath string) (*Translator, error) {
 	var defaultMsgs = map[string]string{}
 
 	err := filepath.WalkDir(langFilePath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			logx.Errorf("walk dir error: %v", err)
+			return err
+		}
 		if d.IsDir() {
 			return nil
 		}

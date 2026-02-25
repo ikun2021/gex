@@ -451,10 +451,7 @@
       }
     },
     "/order/v1/get_order_list": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
+      "get": {
         "produces": [
           "application/json"
         ],
@@ -595,17 +592,14 @@
       }
     },
     "/quotes/v1/get_depth": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
+      "get": {
         "produces": [
           "application/json"
         ],
         "schemes": [
           "https"
         ],
-        "summary": "GetDepth",
+        "summary": "获取深度",
         "operationId": "quoteGetDepth",
         "parameters": [
           {
@@ -688,116 +682,8 @@
         }
       }
     },
-    "/quotes/v1/get_depth_list": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "schemes": [
-          "https"
-        ],
-        "summary": "获取深度",
-        "operationId": "quoteGetDepthList",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "required": [
-                "symbol",
-                "level"
-              ],
-              "properties": {
-                "level": {
-                  "description": "档位",
-                  "type": "integer"
-                },
-                "symbol": {
-                  "description": "交易对",
-                  "type": "string"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "asks": {
-                  "description": "卖盘",
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "qty",
-                      "price",
-                      "amount"
-                    ],
-                    "properties": {
-                      "amount": {
-                        "description": "金额",
-                        "type": "string"
-                      },
-                      "price": {
-                        "description": "价格",
-                        "type": "string"
-                      },
-                      "qty": {
-                        "description": "数量",
-                        "type": "string"
-                      }
-                    }
-                  }
-                },
-                "bids": {
-                  "description": "买盘",
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "qty",
-                      "price",
-                      "amount"
-                    ],
-                    "properties": {
-                      "amount": {
-                        "description": "金额",
-                        "type": "string"
-                      },
-                      "price": {
-                        "description": "价格",
-                        "type": "string"
-                      },
-                      "qty": {
-                        "description": "数量",
-                        "type": "string"
-                      }
-                    }
-                  }
-                },
-                "version": {
-                  "description": "当前版本号",
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/quotes/v1/get_kline_list": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
+      "get": {
         "produces": [
           "application/json"
         ],
@@ -913,10 +799,7 @@
       }
     },
     "/quotes/v1/get_tick_list": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
+      "get": {
         "produces": [
           "application/json"
         ],
@@ -998,10 +881,7 @@
       }
     },
     "/quotes/v1/get_ticker_list": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
+      "get": {
         "produces": [
           "application/json"
         ],
@@ -1092,7 +972,7 @@
       }
     }
   },
-  "x-date": "2026-02-19 23:09:05",
+  "x-date": "2026-02-25 21:48:36",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
