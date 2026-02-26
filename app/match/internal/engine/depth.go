@@ -104,9 +104,11 @@ func (d *DepthHandler) handeUpdateDepth() {
 		select {
 		case par := <-d.paramChan:
 			d.plock.Lock()
-			if par.version < d.currentVersion {
-				continue
-			}
+			//if par.version < d.currentVersion {
+			//	logx.Infof("version is too low, currentVersion: %d, version: %d", d.currentVersion, par.version)
+			//	d.plock.Unlock()
+			//	continue
+			//}
 			var changedPosition *position
 			//更新深度
 			if par.side == enum.Side_Sell {

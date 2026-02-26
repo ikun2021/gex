@@ -556,7 +556,7 @@ LOOP:
 			price: record.Price,
 			qty:   record.Qty,
 		}
-		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, m.version)
 	}
 	matchMsg.MatchResult.MatchTime = time.Now().UnixNano()
 	if len(matchMsg.MatchResult.MatchedRecords) > 0 {
@@ -690,14 +690,14 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *InputMessage) {
 			price: takerOrder.Price,
 			qty:   takerOrder.UnfilledBaseAmount,
 		}
-		m.DepthHandler.updateDepth(p, enum.Side_Buy, Add, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Buy, Add, m.currentMsgId)
 	} //更新深度数据
 	for _, record := range matchMsg.MatchResult.MatchedRecords {
 		p := &position{
 			price: record.Price,
 			qty:   record.Qty,
 		}
-		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Delete, m.currentMsgId)
 	}
 	//更新深度数据
 
@@ -821,11 +821,17 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 			price: takerOrder.Price,
 			qty:   takerOrder.UnfilledBaseAmount,
 		}
-		m.DepthHandler.updateDepth(p, enum.Side_Sell, Add, 0)
+		m.DepthHandler.updateDepth(p, enum.Side_Sell, Add, m.currentMsgId)
 
 	}
 	//更新深度数据
-
+	for _, record := range matchMessage.MatchResult.MatchedRecords {
+		p := &position{
+			price: record.Price,
+			qty:   record.Qty,
+		}
+		m.DepthHandler.updateDepth(p, enum.Side_Buy, Delete, m.currentMsgId)
+	}
 	matchMessage.MatchResult.MatchTime = time.Now().UnixNano()
 	matchMessage.MatchResult.MatchID = cast.ToString(idgen.NextId())
 	m.SendResult(matchMessage)
@@ -833,6 +839,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 }
 
 func (m *MatchEngine) Start() {
+	m.store()
 	ticker := time.NewTicker(time.Minute)
 	isUpdated := false
 	go func() {
@@ -866,7 +873,7 @@ func (m *MatchEngine) store() {
 	go func() {
 		for snapshotData := range m.storeChan {
 			data, _ := json.Marshal(snapshotData)
-			if err := m.redisClient.Set("current_orderbook_"+m.symbolConf.Name, string(data)); err != nil {
+			if err := m.redisClient.Set("match_engine_snapshot:"+cast.ToString(m.symbolConf.Id), string(data)); err != nil {
 				logx.Errorf("store current msg id failed %v", err)
 			}
 		}
@@ -983,6 +990,7 @@ func (m *MatchEngine) handle(order *InputMessage) {
 			MsgId:   m.currentMsgId,
 		})
 	} else {
+		logx.Debugf("处理之前")
 		m.dump()
 		switch {
 		//买单市价单
@@ -1035,6 +1043,8 @@ func (m *MatchEngine) handle(order *InputMessage) {
 
 			}
 		}
+		logx.Debugf("处理之后")
+		m.dump()
 	}
 
 }

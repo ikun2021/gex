@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ikun2021/gex/common/errs"
 	"strings"
 
 	logger "github.com/luxun9527/zlog"
@@ -175,7 +176,7 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	// 脚本返回 0 表示余额不足
 	if cast.ToInt64(res) == 0 {
 		logx.Debugf("User %d has insufficient balance", in.UserId)
-		return nil, errors.New("insufficient balance")
+		return nil, errs.AmountInsufficient
 	}
 
 	// 成功：此时资金已冻结，消息已在 Redis Stream 中。
