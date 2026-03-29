@@ -462,10 +462,9 @@ var AccountService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	OrderService_CreateOrder_FullMethodName       = "/account.OrderService/CreateOrder"
-	OrderService_GetOrderList_FullMethodName      = "/account.OrderService/GetOrderList"
-	OrderService_CancelOrder_FullMethodName       = "/account.OrderService/CancelOrder"
-	OrderService_CreateOrderRevert_FullMethodName = "/account.OrderService/CreateOrderRevert"
+	OrderService_CreateOrder_FullMethodName  = "/account.OrderService/CreateOrder"
+	OrderService_GetOrderList_FullMethodName = "/account.OrderService/GetOrderList"
+	OrderService_CancelOrder_FullMethodName  = "/account.OrderService/CancelOrder"
 )
 
 // OrderServiceClient is the client API for OrderService service.
@@ -478,8 +477,6 @@ type OrderServiceClient interface {
 	GetOrderList(ctx context.Context, in *GetOrderListByUserReq, opts ...grpc.CallOption) (*GetOrderListByUserResp, error)
 	// 取消订单
 	CancelOrder(ctx context.Context, in *CancelOrderReq, opts ...grpc.CallOption) (*OrderEmpty, error)
-	// 下单补偿
-	CreateOrderRevert(ctx context.Context, in *CreateOrderReq, opts ...grpc.CallOption) (*OrderEmpty, error)
 }
 
 type orderServiceClient struct {
@@ -517,15 +514,6 @@ func (c *orderServiceClient) CancelOrder(ctx context.Context, in *CancelOrderReq
 	return out, nil
 }
 
-func (c *orderServiceClient) CreateOrderRevert(ctx context.Context, in *CreateOrderReq, opts ...grpc.CallOption) (*OrderEmpty, error) {
-	out := new(OrderEmpty)
-	err := c.cc.Invoke(ctx, OrderService_CreateOrderRevert_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // OrderServiceServer is the server API for OrderService service.
 // All implementations must embed UnimplementedOrderServiceServer
 // for forward compatibility
@@ -536,8 +524,6 @@ type OrderServiceServer interface {
 	GetOrderList(context.Context, *GetOrderListByUserReq) (*GetOrderListByUserResp, error)
 	// 取消订单
 	CancelOrder(context.Context, *CancelOrderReq) (*OrderEmpty, error)
-	// 下单补偿
-	CreateOrderRevert(context.Context, *CreateOrderReq) (*OrderEmpty, error)
 	mustEmbedUnimplementedOrderServiceServer()
 }
 
@@ -553,9 +539,6 @@ func (UnimplementedOrderServiceServer) GetOrderList(context.Context, *GetOrderLi
 }
 func (UnimplementedOrderServiceServer) CancelOrder(context.Context, *CancelOrderReq) (*OrderEmpty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelOrder not implemented")
-}
-func (UnimplementedOrderServiceServer) CreateOrderRevert(context.Context, *CreateOrderReq) (*OrderEmpty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateOrderRevert not implemented")
 }
 func (UnimplementedOrderServiceServer) mustEmbedUnimplementedOrderServiceServer() {}
 
@@ -624,24 +607,6 @@ func _OrderService_CancelOrder_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrderService_CreateOrderRevert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateOrderReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).CreateOrderRevert(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_CreateOrderRevert_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).CreateOrderRevert(ctx, req.(*CreateOrderReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // OrderService_ServiceDesc is the grpc.ServiceDesc for OrderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -660,10 +625,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelOrder",
 			Handler:    _OrderService_CancelOrder_Handler,
-		},
-		{
-			MethodName: "CreateOrderRevert",
-			Handler:    _OrderService_CreateOrderRevert_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -40,9 +40,3 @@ func (s *OrderServiceServer) CancelOrder(ctx context.Context, in *pb.CancelOrder
 	l := orderservicelogic.NewCancelOrderLogic(ctx, s.svcCtx)
 	return l.CancelOrder(in)
 }
-
-// 下单补偿
-func (s *OrderServiceServer) CreateOrderRevert(ctx context.Context, in *pb.CreateOrderReq) (*pb.OrderEmpty, error) {
-	l := orderservicelogic.NewCreateOrderRevertLogic(ctx, s.svcCtx)
-	return l.CreateOrderRevert(in)
-}

@@ -241,6 +241,46 @@ message UpdateOrderStatusReq{
 
 
 
+// 订单详情信息
+message OrderInfo {
+  // 序号 主键 雪花算法生成
+  int64 id = 1;
+  // 订单号
+  string order_id = 2;
+  // 用户id
+  int64 user_id = 3;
+  // 交易对ID
+  int32 symbol_id = 4;
+  // 交易对名称
+  string symbol_name = 5;
+  // 下单数量
+  string base_amount = 6;
+  // 价格
+  string price = 7;
+  // 方向 1:买, 2:卖
+  commonEnum.Side side = 8;
+  // 金额
+  string quote_amount = 9;
+  // 状态
+  commonEnum.OrderStatus status = 10;
+  // 订单类型 1:市价单, 2:限价单
+  commonEnum.OrderType order_type = 11;
+  // 成交数量
+  string filled_base_amount = 12;
+  // 未成交数量
+  string un_filled_base_amount = 13;
+  // 成交均价
+  string filled_avg_price = 14;
+  // 成交金额
+  string filled_quote_amount = 15;
+  // 未成交金额
+  string un_filled_quote_amount = 16;
+  // 创建时间
+  int64 created_at = 17;
+  // 修改时间
+  int64 updated_at = 18;
+}
+
 service OrderService {
   //创建订单
   rpc CreateOrder(CreateOrderReq)returns(OrderEmpty);
@@ -248,9 +288,7 @@ service OrderService {
   rpc GetOrderList(GetOrderListByUserReq)returns(GetOrderListByUserResp);
   //取消订单
   rpc CancelOrder(CancelOrderReq)returns(OrderEmpty);
-  //下单补偿
-  rpc CreateOrderRevert(CreateOrderReq)returns(OrderEmpty);
-  //获取所有订单状态为未成交或部分成交的订单
+
 }
 
 

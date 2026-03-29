@@ -39,6 +39,6 @@ func (l *CreateOrderLogic) CreateOrder(req *types.CreateOrderReq) (resp *types.E
 	if err != nil {
 		l.Logger.Errorf("create order failed: %v", err)
 	}
-	return nil, err
+	return &types.Empty{}, err
 
 }

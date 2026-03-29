@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ikun2021/gex/common/errs"
 	"strings"
 
-	logger "github.com/luxun9527/zlog"
+	"github.com/ikun2021/gex/common/errs"
+
+	"time"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
@@ -28,41 +29,59 @@ const StreamKeyMQOutbox = "mq_outbox"
 // 订单详情在 Redis 中的过期时间 (秒)
 const OrderCacheTTL = 600
 
-// Lua脚本：原子性检查余额、冻结资金、写入Stream、写入缓存
-// KEYS[1]: balanceKey (balance:{uid})
-// KEYS[2]: streamKey  (mq_outbox)
-// KEYS[3]: orderKey   (order:{order_id})
-// ARGV[1]: availField (e.g. "USDT")
-// ARGV[2]: frozenField (e.g. "USDT_frozen")
-// ARGV[3]: changeAmount (int64)
-// ARGV[4]: orderData (binary string)
-// ARGV[5]: orderTTL (int)
+// Lua脚本详情：
+// 1. 原子性：检查余额、扣减资金、写入发件箱、记录快照在一个事务中完成。
+// 2. 幂等性：使用 idempotencyKey 防止重复下单。
+// 3. 集群兼容：通过 {slotId} hash-tag 确保相关的所有 Key 落在同一个分片上。
+// KEYS: [balanceKey, streamKey, activeOrdersKey, idempotencyKey]
+// ARGV: [availField, frozenField, amount, streamData, orderId, orderInfoData, expireTime]
 var atomicOrderScript = redis.NewScript(`
-local balanceKey = KEYS[1]
-local streamKey  = KEYS[2]
-local orderKey   = KEYS[3]
+local balanceKey      = KEYS[1]
+local streamKey       = KEYS[2]
+local activeOrdersKey = KEYS[3]
+local idempotencyKey  = KEYS[4]
 
-local availField   = ARGV[1]
-local frozenField  = ARGV[2]
-local changeAmount = tonumber(ARGV[3])
-local orderData    = ARGV[4]
-local orderTTL     = ARGV[5]
+local availField      = ARGV[1]
+local frozenField     = ARGV[2]
+local changeAmount    = tonumber(ARGV[3])
+local streamData      = ARGV[4]
+local orderId         = ARGV[5]
+local orderInfoData   = ARGV[6]
+local expireTime      = ARGV[7]
 
--- 1. 检查余额
-local currentAvail = tonumber(redis.call("HGET", balanceKey, availField) or "0")
-if currentAvail < changeAmount then
-    return 0 -- 失败: 余额不足
+-- 1. 幂等检查
+if redis.call("EXISTS", idempotencyKey) == 1 then
+    return -1
 end
 
--- 2. 变更资金 (扣减可用，增加冻结)
+-- 2. 预检查类型
+local balanceType = redis.call("TYPE", balanceKey).ok
+if balanceType ~= "hash" and balanceType ~= "none" then
+    return -3
+end
+
+-- 3. 余额校验
+local currentAvail = tonumber(redis.call("HGET", balanceKey, availField) or "0")
+if currentAvail < changeAmount then
+    return -2
+end
+
+-- 4. 执行变更 (原子操作)
+-- 4.1 写入发件箱 (Stream)
+local streamOk = redis.call("XADD", streamKey, "*", "payload", streamData, "oid", orderId)
+if not streamOk then
+    return -4
+end
+
+-- 4.2 变更资金 (扣减可用，增加冻结)
 redis.call("HINCRBY", balanceKey, availField, -changeAmount)
 redis.call("HINCRBY", balanceKey, frozenField, changeAmount)
 
--- 3. 写入发件箱 (Stream)，由 Relayer 异步搬运到 Pulsar
-redis.call("XADD", streamKey, "*", "payload", orderData)
+-- 4.3 写入活跃订单快照
+redis.call("HSET", activeOrdersKey, orderId, orderInfoData)
 
--- 4. 写入订单详情缓存 (供查询和幂等检查)
-redis.call("SET", orderKey, orderData, "EX", orderTTL)
+-- 4.4 标记幂等
+redis.call("SET", idempotencyKey, "1", "EX", expireTime)
 
 return 1 -- 成功
 `)
@@ -82,35 +101,55 @@ func NewCreateOrderLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Creat
 }
 
 func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, error) {
-	// 1. 解析参数
-	price, _ := decimal.NewFromString(in.Price)
-	amount, err := decimal.NewFromString(in.BaseAmount)
-	if err != nil {
-		return nil, errors.New("invalid amount")
-	}
 
+	if in.OrderType != enum.OrderType_MO && in.OrderType != enum.OrderType_LO {
+		return nil, errs.WarpMessage(errs.ParamValidateFailed, "order type is invalid")
+	}
+	var (
+		price, baseAmount, quoteAmount decimal.Decimal
+		freezeCurrency                 string
+		freezeAmountInt                int64
+	)
+	price, err := decimal.NewFromString(in.Price)
+	if err != nil {
+		return nil, errs.WarpMessage(errs.ParamValidateFailed, "price invalid")
+	}
 	parts := strings.Split(in.SymbolName, "_")
 	if len(parts) != 2 {
 		return &pb.OrderEmpty{}, errors.New("invalid symbol format")
 	}
 	baseCcy, quoteCcy := parts[0], parts[1]
 
-	// 2. 计算冻结金额和币种
-	var freezeCurrency string
-	var freezeAmountInt int64
-
-	if in.Side == enum.Side_Buy {
-		// 买入: 冻结 Quote Currency (如 USDT)
-		totalCost := price.Mul(amount)
-		freezeCurrency = quoteCcy
-		freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, totalCost.String())
+	if in.OrderType == enum.OrderType_LO {
+		price, err = decimal.NewFromString(in.Price)
+		if err != nil {
+			return nil, errs.WarpMessage(errs.ParamValidateFailed, "price invalid")
+		}
+		quoteAmount = price.Mul(baseAmount)
+		if in.Side == enum.Side_Buy {
+			// 买入: 冻结 Quote Currency (如 USDT)
+			totalCost := price.Mul(baseAmount)
+			freezeCurrency = quoteCcy
+			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, totalCost.String())
+		} else {
+			// 卖出: 冻结 Base Currency (如 BTC)
+			freezeCurrency = baseCcy
+			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, baseAmount.String())
+		}
 	} else {
-		// 卖出: 冻结 Base Currency (如 BTC)
-		freezeCurrency = baseCcy
-		freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, amount.String())
-	}
-	if err != nil {
-		return nil, err
+		quoteAmount, err = decimal.NewFromString(in.QuoteAmount)
+		if err != nil {
+			return nil, errs.WarpMessage(errs.ParamValidateFailed, "quote amount invalid")
+		}
+		if in.Side == enum.Side_Buy {
+			// 买入: 冻结 Quote Currency (如 USDT)
+			freezeCurrency = quoteCcy
+			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, quoteAmount.String())
+		} else {
+			// 卖出: 冻结 Base Currency (如 BTC)
+			freezeCurrency = baseCcy
+			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, baseAmount.String())
+		}
 	}
 
 	// 3. 生成 ID
@@ -127,8 +166,8 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 				Uid:         in.UserId,
 				Side:        in.Side,
 				Price:       price.String(),
-				BaseAmount:  amount.String(),
-				QuoteAmount: in.QuoteAmount,
+				BaseAmount:  baseAmount.String(),
+				QuoteAmount: quoteAmount.String(),
 				OrderType:   in.OrderType,
 				SymbolId:    in.SymbolId,
 				SymbolName:  in.SymbolName,
@@ -137,49 +176,83 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 		MessageId: seqId,
 	}
 
-	// 序列化 Proto
-	dataBytes, err := proto.Marshal(matchInput)
+	// 序列化 Proto (Stream 端)
+	streamDataBytes, err := proto.Marshal(matchInput)
 	if err != nil {
-		return nil, fmt.Errorf("marshal failed: %v", err)
+		return nil, fmt.Errorf("marshal matchInput failed: %v", err)
 	}
-	// Redis String 是二进制安全的，可以直接存储 Proto 字节流
-	orderDataStr := string(dataBytes)
+	streamDataStr := string(streamDataBytes)
 
-	// 5. 准备 Lua 脚本参数
-	balanceKey := fmt.Sprintf("balance:%d", in.UserId)                  // KEYS[1]
-	streamKey := fmt.Sprintf("%s_%s", StreamKeyMQOutbox, in.SymbolName) // KEYS[2]
-	orderKey := fmt.Sprintf("order:%s", orderId)                        // KEYS[3]
+	// 5. 构建 OrderInfo (Redis 快照端)
+	now := time.Now().UnixMilli()
+	orderInfo := &pb.OrderInfo{
+		Id:                  seqId,
+		OrderId:             orderId,
+		UserId:              in.UserId,
+		SymbolId:            in.SymbolId,
+		SymbolName:          in.SymbolName,
+		BaseAmount:          baseAmount.String(),
+		Price:               price.String(),
+		Side:                in.Side,
+		QuoteAmount:         in.QuoteAmount,
+		Status:              enum.OrderStatus_NewCreated,
+		OrderType:           in.OrderType,
+		FilledBaseAmount:    "0",
+		UnFilledBaseAmount:  baseAmount.String(),
+		FilledAvgPrice:      "0",
+		FilledQuoteAmount:   "0",
+		UnFilledQuoteAmount: in.QuoteAmount,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	orderInfoDataBytes, err := proto.Marshal(orderInfo)
+	if err != nil {
+		return nil, fmt.Errorf("marshal orderInfo failed: %v", err)
+	}
+	orderInfoDataStr := string(orderInfoDataBytes)
 
-	availField := freezeCurrency              // ARGV[1]
-	frozenField := freezeCurrency + "_frozen" // ARGV[2]
+	// 6. 准备 Lua 脚本参数 (使用 slotId 分桶 HashTag 保证 Redis Cluster 集群原子性并限制 Stream 数量)
+	const MaxSlots = 16384
+	slotId := in.UserId % MaxSlots
+	tag := fmt.Sprintf("{%d}", slotId)
 
-	keys := []string{balanceKey, streamKey, orderKey}
+	balanceKey := fmt.Sprintf("balance:%s:%d", tag, in.UserId)
+	activeOrdersKey := fmt.Sprintf("orders:active:%s:%d", tag, in.UserId)
+	streamKey := fmt.Sprintf("%s_%s:%s", StreamKeyMQOutbox, in.SymbolName, tag) // 同一 Slot 的分桶 Stream
+	idempotencyKey := fmt.Sprintf("req:order:%s:%s", orderId, tag)
+
+	keys := []string{balanceKey, streamKey, activeOrdersKey, idempotencyKey}
 	args := []interface{}{
-		availField,      // ARGV[1]
-		frozenField,     // ARGV[2]
-		freezeAmountInt, // ARGV[3]
-		orderDataStr,    // ARGV[4] Payload
-		OrderCacheTTL,   // ARGV[5] TTL
+		freezeCurrency,             // ARGV[1] availField
+		freezeCurrency + "_frozen", // ARGV[2] frozenField
+		freezeAmountInt,            // ARGV[3] amount
+		streamDataStr,              // ARGV[4] streamData
+		orderId,                    // ARGV[5] orderId
+		orderInfoDataStr,           // ARGV[6] orderInfoData
+		86400,                      // ARGV[7] expireTime
 	}
 
-	// 6. 执行原子脚本
-	// 这一步替代了原来的 DB 操作和 Producer.Send
 	res, err := atomicOrderScript.Run(l.ctx, l.svcCtx.RedisCli, keys, args...).Result()
-
 	if err != nil {
-		logx.Errorw("Execute redis lua failed", logger.ErrorField(err))
-		// 区分 Redis 系统错误和业务错误，这里统一返回系统忙
+		logx.Errorw("Execute redis lua failed", logx.Field("err", err))
 		return nil, err
-
 	}
 
-	// 脚本返回 0 表示余额不足
-	if cast.ToInt64(res) == 0 {
-		logx.Debugf("User %d has insufficient balance", in.UserId)
+	// 7. 处理返回结果
+	resultCode := cast.ToInt64(res)
+	switch resultCode {
+	case 1:
+		// 成功：原子操作完成 (资产扣减 + Stream 写入)
+		return &pb.OrderEmpty{}, nil
+	case -1:
+		return &pb.OrderEmpty{}, nil
+	case -2:
 		return nil, errs.AmountInsufficient
+	case -3:
+		return nil, fmt.Errorf("redis type conflict")
+	case -4:
+		return nil, fmt.Errorf("mq stream write failed")
+	default:
+		return nil, fmt.Errorf("unexpected script result: %d", resultCode)
 	}
-
-	// 成功：此时资金已冻结，消息已在 Redis Stream 中。
-	// 后台的 Relayer 组件会负责将 Stream 中的消息搬运到 Pulsar。
-	return &pb.OrderEmpty{}, nil
 }

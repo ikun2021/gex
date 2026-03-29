@@ -937,16 +937,16 @@ func (m *MatchEngine) recover() {
 	logx.Infof("match engine recover success symbol=%v msgId=%v asks=%d bids=%d", m.symbolConf.Name, m.currentMsgId, len(data.Asks), len(data.Bids))
 }
 
-func (m *MatchEngine) handle(order *InputMessage) {
+func (m *MatchEngine) handle(inputMsg *InputMessage) {
 
 	k := &Key{
-		price: order.Price,
-		id:    order.OrderPkId,
+		price: inputMsg.Price,
+		id:    inputMsg.OrderPkId,
 	}
 	var o interface{}
 	var found bool
-	if order.OrderType == enum.OrderType_LO {
-		if order.Side == enum.Side_Sell {
+	if inputMsg.OrderType == enum.OrderType_LO {
+		if inputMsg.Side == enum.Side_Sell {
 			o, found = m.asks.orderBook.Get(k)
 		} else {
 			o, found = m.bids.orderBook.Get(k)
@@ -955,33 +955,33 @@ func (m *MatchEngine) handle(order *InputMessage) {
 	//判断订单是否存在
 	//取消的话存在并且
 	//新增的时候
-	if (order.IsCancel && !found) || (!order.IsCancel && found) {
+	if (inputMsg.IsCancel && !found) || (!inputMsg.IsCancel && found) {
 		return
 	}
 
-	if order.IsCancel {
+	if inputMsg.IsCancel {
 		orderDetail := o.(*InputMessage)
-		order.UnfilledBaseAmount = orderDetail.UnfilledBaseAmount
-		order.UnfilledQuoteAmount = orderDetail.UnfilledQuoteAmount
-		order.QuoteAmount = orderDetail.QuoteAmount
-		order.BaseAmount = orderDetail.BaseAmount
+		inputMsg.UnfilledBaseAmount = orderDetail.UnfilledBaseAmount
+		inputMsg.UnfilledQuoteAmount = orderDetail.UnfilledQuoteAmount
+		inputMsg.QuoteAmount = orderDetail.QuoteAmount
+		inputMsg.BaseAmount = orderDetail.BaseAmount
 		//订单簿删除订单
-		m.cancelOrder(order)
+		m.cancelOrder(inputMsg)
 		//更新盘口深度
 		m.DepthHandler.updateDepth(&position{
-			price: order.Price,
-			qty:   order.UnfilledBaseAmount,
-		}, order.Side, Delete, 0)
+			price: inputMsg.Price,
+			qty:   inputMsg.UnfilledBaseAmount,
+		}, inputMsg.Side, Delete, 0)
 		//发送取消订单消息
 
-		coinId, qty := m.symbolConf.BaseCoinId, order.UnfilledBaseAmount.String()
+		coinId, qty := m.symbolConf.BaseCoinId, inputMsg.UnfilledBaseAmount.String()
 		if orderDetail.Side == enum.Side_Buy {
 			coinId = m.symbolConf.QuoteCoinId
-			qty = order.UnfilledQuoteAmount.String()
+			qty = inputMsg.UnfilledQuoteAmount.String()
 		}
 		m.SendResult(&MatchOutputMessage{
 			CancelResult: &CancelResult{
-				CancelId: order.OrderPkId,
+				CancelId: inputMsg.OrderPkId,
 				CoinId:   coinId,
 				Amount:   qty,
 				Uid:      orderDetail.Uid,
@@ -994,52 +994,52 @@ func (m *MatchEngine) handle(order *InputMessage) {
 		m.dump()
 		switch {
 		//买单市价单
-		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_MO:
-			m.matchMarkerOrderBuy(order)
+		case inputMsg.Side == enum.Side_Buy && inputMsg.OrderType == enum.OrderType_MO:
+			m.matchMarkerOrderBuy(inputMsg)
 		//买单限价单,发送一条accepted消息
-		case order.Side == enum.Side_Buy && order.OrderType == enum.OrderType_LO:
+		case inputMsg.Side == enum.Side_Buy && inputMsg.OrderType == enum.OrderType_LO:
 
 			//价格大于卖一价，同时卖一价不为零
-			if order.Price.GreaterThanOrEqual(m.bestAsk) && m.bestAsk.GreaterThan(utils.DecimalZeroMaxPrec) {
-				m.matchLimitOrderBuy(order)
+			if inputMsg.Price.GreaterThanOrEqual(m.bestAsk) && m.bestAsk.GreaterThan(utils.DecimalZeroMaxPrec) {
+				m.matchLimitOrderBuy(inputMsg)
 			} else {
 
-				m.addOrder(order)
+				m.addOrder(inputMsg)
 				//更新盘口深度
 				m.DepthHandler.updateDepth(&position{
-					price: order.Price,
-					qty:   order.UnfilledBaseAmount,
-				}, order.Side, Add, 0)
+					price: inputMsg.Price,
+					qty:   inputMsg.UnfilledBaseAmount,
+				}, inputMsg.Side, Add, 0)
 				//更新盘口深度
 			}
 		//卖单市价单
-		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_MO:
-			m.matchMarketOrderSell(order)
+		case inputMsg.Side == enum.Side_Sell && inputMsg.OrderType == enum.OrderType_MO:
+			m.matchMarketOrderSell(inputMsg)
 		//买单限价单,发送一条accepted消息
-		case order.Side == enum.Side_Sell && order.OrderType == enum.OrderType_LO:
+		case inputMsg.Side == enum.Side_Sell && inputMsg.OrderType == enum.OrderType_LO:
 			m.SendResult(&MatchOutputMessage{
 				AcceptedResult: &AcceptedResult{
-					OrderId:     order.OrderID,
-					Uid:         order.Uid,
-					side:        order.Side,
-					price:       order.Price.String(),
-					quoteAmount: order.QuoteAmount.String(),
-					baseAmount:  order.BaseAmount.String(),
+					OrderId:     inputMsg.OrderID,
+					Uid:         inputMsg.Uid,
+					side:        inputMsg.Side,
+					price:       inputMsg.Price.String(),
+					quoteAmount: inputMsg.QuoteAmount.String(),
+					baseAmount:  inputMsg.BaseAmount.String(),
 				},
 				MsgType: MsgTypeAcceptedResult,
 			})
 
-			if order.Price.LessThanOrEqual(m.bestBid) && m.bestBid.GreaterThan(utils.DecimalZeroMaxPrec) {
-				m.matchLimitOrderSell(order)
+			if inputMsg.Price.LessThanOrEqual(m.bestBid) && m.bestBid.GreaterThan(utils.DecimalZeroMaxPrec) {
+				m.matchLimitOrderSell(inputMsg)
 			} else {
 
-				m.addOrder(order)
+				m.addOrder(inputMsg)
 				//更新盘口深度
 				//更新盘口深度
 				m.DepthHandler.updateDepth(&position{
-					price: order.Price,
-					qty:   order.UnfilledBaseAmount,
-				}, order.Side, Add, 0)
+					price: inputMsg.Price,
+					qty:   inputMsg.UnfilledBaseAmount,
+				}, inputMsg.Side, Add, 0)
 
 			}
 		}
