@@ -42,9 +42,10 @@ func StartRelayer(rdb *redis.Client, pulsarProducer map[string]pulsar.Producer) 
 
 				// 2. 初始化消费者组 (批量流的话可能耗时，按需创建或全量初试化)
 				for _, s := range streams {
-
 					if err := rdb.XGroupCreateMkStream(ctx, s, group, "0").Err(); err != nil {
-						logx.Severef("start redis lua failed err: %v", err)
+						if !isGroupExistErr(err) {
+							logx.Errorf("start redis relayer group failed err: %v", err)
+						}
 					}
 				}
 

@@ -227,10 +227,12 @@ message GetOrderListByUserResp{
 message FreezeUserAssetResp{}
 
 message CancelOrderReq{
-  //订单id
-  int64 id=1;
-  //用户id
-  int64 uid=2;
+  // 订单ID
+  string order_id = 1;
+  // 用户ID
+  int64 uid = 2;
+  // 交易对名称
+  string symbol_name = 3;
 }
 message UpdateOrderStatusReq{
   //订单id

@@ -42,6 +42,7 @@ type MatchEngine struct {
 	currentPulsarMessageId pulsar.MessageID
 	DepthHandler           *DepthHandler
 	wsClient               ws.ProxyClient
+	Consumer               pulsar.Consumer
 }
 
 func (m *MatchEngine) Gte(msgId int64) bool {
@@ -237,7 +238,7 @@ type AcceptedResp struct {
 	Uid int64
 }
 
-func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer, redisClient *redis.Redis, client ws.ProxyClient) *MatchEngine {
+func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Producer, consumer pulsar.Consumer, redisClient *redis.Redis, client ws.ProxyClient) *MatchEngine {
 	me := &MatchEngine{
 		asks:               NewOrderBook(enum.Side_Sell),
 		bids:               NewOrderBook(enum.Side_Buy),
@@ -251,6 +252,7 @@ func NewMatchEngine(c models.Symbol, conf config.Config, producer pulsar.Produce
 		input:              make(chan *InputMessage, 1000),
 		storeChan:          make(chan *SnapshotData, 1000),
 		wsClient:           client,
+		Consumer:           consumer,
 	}
 	me.recover()
 	return me
@@ -840,7 +842,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 
 func (m *MatchEngine) Start() {
 	m.store()
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(time.Second * 10)
 	isUpdated := false
 	go func() {
 		for {
@@ -876,6 +878,10 @@ func (m *MatchEngine) store() {
 			if err := m.redisClient.Set("match_engine_snapshot:"+cast.ToString(m.symbolConf.Id), string(data)); err != nil {
 				logx.Errorf("store current msg id failed %v", err)
 			}
+			if err := m.Consumer.AckIDCumulative(snapshotData.PulsarMsgID); err != nil {
+				logx.Errorf("store ack msg id failed %v", err)
+			}
+			logx.Infof("match engine store success symbol=%v msgId=%v", m.symbolConf.Name, m.currentMsgId)
 		}
 	}()
 }

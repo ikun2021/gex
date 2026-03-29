@@ -50,7 +50,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 			if err != nil {
 				logx.Severef("init pulsar producer failed %v", err)
 			}
-			me := engine.NewMatchEngine(symbol, sc.Config, producer, sc.RedisClient, sc.WsClient)
+			me := engine.NewMatchEngine(symbol, sc.Config, producer, consumer, sc.RedisClient, sc.WsClient)
 			me.Start()
 			Handlers[symbol.Name] = me
 			for {
