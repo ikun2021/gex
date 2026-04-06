@@ -230,8 +230,10 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 		}
 	}
 
-	takerBalanceKey := fmt.Sprintf("balance:%d", taker.Uid)
-	makerBalanceKey := fmt.Sprintf("balance:%d", maker.Uid)
+	tagTaker := l.getTag(taker.Uid)
+	tagMaker := l.getTag(maker.Uid)
+	takerBalanceKey := fmt.Sprintf("balance:%s:%d", tagTaker, taker.Uid)
+	makerBalanceKey := fmt.Sprintf("balance:%s:%d", tagMaker, maker.Uid)
 	takerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", taker.Uid, symbolName)
 	makerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", maker.Uid, symbolName)
 	idempotentKey := fmt.Sprintf("match_processed:%s", record.MatchSubId)
@@ -264,7 +266,7 @@ func NewHandleMatchResultLogic(svcCtx *svc.ServiceContext) *HandleMatchResultLog
 	}
 }
 
-func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelResult, messageId int64, storeConsumedMessageId func() error) error {
+func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelResult, messageId int64, symbolName string, storeConsumedMessageId func() error) error {
 	res := cancelResp
 	ctx := context.Background()
 
@@ -286,12 +288,16 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	orderId := fmt.Sprintf("%d%d%d", 2, int32(res.Side), res.Id)
 
 	// 4. 处理资产解冻
-	balanceKey := fmt.Sprintf("balance:%d", res.Uid)
+	tag := l.getTag(res.Uid)
+	balanceKey := fmt.Sprintf("balance:%s:%d", tag, res.Uid)
 	idempotentKey := fmt.Sprintf("match_processed:cancel:%d", messageId)
 
-	// TODO: 目前 CancelResult 缺少 symbol_name，暂时无法删除分区索引 open_orders:{uid}:{symbol}
 	// 后续如果协议更新，可以将 dummy 替换为真实 key。
-	keys := []string{balanceKey, "open_orders_dummy", idempotentKey}
+	if symbolName == "" {
+		symbolName = "dummy"
+	}
+	openOrdersKey := fmt.Sprintf("open_orders:%d:%s", res.Uid, symbolName)
+	keys := []string{balanceKey, openOrdersKey, idempotentKey}
 	args := []interface{}{
 		coinName + "_frozen",
 		coinName,
@@ -342,4 +348,9 @@ func (l *HandleMatchResultLogic) getCoinName(coinId int32) string {
 		}
 	}
 	return name
+}
+
+func (l *HandleMatchResultLogic) getTag(uid int64) string {
+	const MaxSlots = 16384
+	return fmt.Sprintf("{%d}", uid%MaxSlots)
 }

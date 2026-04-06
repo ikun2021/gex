@@ -5,7 +5,7 @@ import (
 	"github.com/ikun2021/gex/app/admin/api/internal/svc"
 	"github.com/ikun2021/gex/app/admin/api/internal/types"
 	"github.com/ikun2021/gex/common/errs"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"gopkg.in/yaml.v3"
 
 	"github.com/zeromicro/go-zero/core/logx"

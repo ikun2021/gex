@@ -17,8 +17,8 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/gookit/goutil v0.6.15
 	github.com/gorilla/websocket v1.5.0
+	github.com/ikun2021/zlog v1.1.15
 	github.com/luxun9527/gpush v1.0.0
-	github.com/luxun9527/zlog v1.0.9
 	github.com/nicksnyder/go-i18n/v2 v2.4.1
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.2

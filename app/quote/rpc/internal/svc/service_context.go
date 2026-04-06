@@ -7,8 +7,8 @@ import (
 	"github.com/yitter/idgenerator-go/idgen"
 	"gorm.io/gorm"
 
+	logger "github.com/ikun2021/zlog"
 	gpushPb "github.com/luxun9527/gpush/proto"
-	logger "github.com/luxun9527/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/zrpc"

@@ -3,7 +3,7 @@ package confx
 import (
 	"context"
 	"github.com/ikun2021/gex/common/pkg/etcd"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.etcd.io/etcd/api/v3/mvccpb"

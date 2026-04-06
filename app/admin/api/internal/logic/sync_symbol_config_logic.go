@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 	"github.com/ikun2021/gex/common/proto/define"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"gopkg.in/yaml.v3"
 
 	"github.com/ikun2021/gex/app/admin/api/internal/svc"

@@ -3,7 +3,7 @@ package accountservicelogic
 import (
 	"context"
 	"github.com/ikun2021/gex/common/errs"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"

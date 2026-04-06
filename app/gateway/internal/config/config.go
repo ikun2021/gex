@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/luxun9527/zlog"
+	"github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"
 )
@@ -65,7 +65,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
 					continue
 				}
-				logx.Debugf("receive match request %v", matchReq)
+				logx.Infof("receive match request %v", matchReq)
 
 				if me.Gte(matchReq.MessageId) {
 					logx.Slowf("current msg id %v", matchReq.MessageId)

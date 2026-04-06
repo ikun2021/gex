@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/ikun2021/gex/common/errs"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"google.golang.org/grpc/status"
@@ -27,7 +27,7 @@ func Response(w http.ResponseWriter, r *http.Request, resp interface{}, err erro
 		}
 		body.Code = int(e.Code())
 		code := e.Code()
-		
+
 		body.Msg = errs.Code(code).Translate(lang)
 
 		if e.Message() != "" && int(e.Code()) > int(errs.CommonCodeInit) {

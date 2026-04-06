@@ -7,7 +7,7 @@ import (
 	"github.com/ikun2021/gex/app/gateway/internal/middleware"
 	"github.com/ikun2021/gex/app/match/matchservice"
 	"github.com/ikun2021/gex/common/errs"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"

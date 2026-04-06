@@ -5,7 +5,7 @@ import (
 	"github.com/gookit/goutil/strutil"
 	"github.com/ikun2021/gex/common/errs"
 	"github.com/ikun2021/gex/common/proto/define"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"

@@ -6,7 +6,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"
 )
@@ -24,7 +24,7 @@ func InitConsumer(sc *svc.ServiceContext) {
 					logx.Errorw("handler message match result failed", logger.ErrorField(err))
 					continue
 				}
-				var m matchMq.MatchInput
+				var m matchMq.MatchOutput
 				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
 					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 					if err := c.Ack(message); err != nil {
@@ -32,18 +32,17 @@ func InitConsumer(sc *svc.ServiceContext) {
 					}
 					continue
 				}
-
-				switch r := m.Event.(type) {
-				case *matchMq.MatchInput_CreateOrder:
-					logx.Debugf("match result create order %s", r.CreateOrder)
-				case *matchMq.MatchInput_CancelOrder:
-
-					//解冻用户资产
+				switch msg := m.Result.(type) {
+				case *matchMq.MatchOutput_MatchResult:
+					// 下单成功
+				case *matchMq.MatchOutput_CancelResult:
+					// 取消订单成功
+					Cancel(sc, msg, m.MessageId)
+				case *matchMq.MatchOutput_AcceptedResult:
+					// 订单被接受
 				}
-				if err := c.Ack(message); err != nil {
-					logx.Severef("ack message failed err = %v message =%v", err, message)
+				logx.Debugf("match result %v", &m)
 
-				}
 			}
 
 		}(consumer)

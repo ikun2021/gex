@@ -9,7 +9,7 @@ import (
 	"github.com/ikun2021/gex/common/defines"
 	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/utils"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"github.com/redis/go-redis/v9"
 	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -48,8 +48,24 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			DisableBatching: true,
 		})
 		if err != nil {
-			logx.Severef("init match producer error:%v", err)
+			logx.Severef("create producer failed %v", err)
 		}
+		consumerTopic := pulsarConfig.Topic{
+			Tenant:    pulsarConfig.PublicTenant,
+			Namespace: pulsarConfig.GexNamespace,
+			Topic:     defines.MatchTopicOutputPrefix + v.Name,
+		}
+		logx.Infof("create consumer topic %s", consumerTopic.BuildTopic())
+		consumer, err := client.Subscribe(pulsar.ConsumerOptions{
+			Topic:            consumerTopic.BuildTopic(),
+			SubscriptionName: "account_" + v.Name,
+		})
+		if err != nil {
+			logx.Severef("init match consumer error:%v", err)
+			continue
+		}
+		consumers = append(consumers, consumer)
+
 		m[v.Name] = producer
 	}
 

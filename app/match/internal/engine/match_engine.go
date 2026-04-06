@@ -14,8 +14,8 @@ import (
 	enum "github.com/ikun2021/gex/common/proto/enum"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
+	logger "github.com/ikun2021/zlog"
 	ws "github.com/luxun9527/gpush/proto"
-	logger "github.com/luxun9527/zlog"
 	"github.com/shopspring/decimal"
 	"github.com/spf13/cast"
 	"github.com/yitter/idgenerator-go/idgen"
@@ -1143,12 +1143,14 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 				Uid:    matchMsg.CancelResult.Uid,
 			},
 		}
+		logx.Infof("send cancel result %+v to topic %s", &resp, m.producer.Topic())
 	case MsgTypeAcceptedResult:
 
 	}
 
-	logx.Debugw("send match result", logx.Field("data", &resp))
+	logx.Infof("send match result %v to topic %s", &resp, m.producer.Topic())
 	data, _ := proto.Marshal(&resp)
+
 	var err error
 	for i := 1; true; i++ {
 		if _, err = m.producer.Send(context.Background(), &pulsar.ProducerMessage{

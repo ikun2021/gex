@@ -7,7 +7,7 @@ import (
 	"github.com/ikun2021/gex/common/errs"
 	"github.com/ikun2021/gex/common/proto/define"
 	"github.com/ikun2021/gex/common/utils"
-	logger "github.com/luxun9527/zlog"
+	logger "github.com/ikun2021/zlog"
 	"gorm.io/gorm"
 
 	"github.com/gookit/goutil/strutil"
