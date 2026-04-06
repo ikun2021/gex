@@ -65,7 +65,6 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 					logx.Errorw("unmarshal message fail", logger.ErrorField(err))
 					continue
 				}
-				logx.Infof("receive match request %v", matchReq)
 
 				if me.Gte(matchReq.MessageId) {
 					logx.Slowf("current msg id %v", matchReq.MessageId)

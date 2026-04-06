@@ -149,6 +149,8 @@ message MatchResult{
 }
 //取消订单返回，表示订单被撤单
 message CancelResult{
+  //订单id
+  string order_id = 8;
   //订单主键id
   int64 id = 1;
   //解冻币种id
@@ -161,4 +163,6 @@ message CancelResult{
   int64 uid = 4;
   //方向
   commonEnum.Side side = 6;
+  //订单类型
+  commonEnum.OrderType order_type = 7;
 }

@@ -6,10 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cast"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
-	"github.com/ikun2021/gex/common/proto/define"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/utils"
 	"github.com/redis/go-redis/v9"
@@ -97,10 +95,10 @@ redis.call("SET", KEYS[2], "1", "EX", ARGV[3])
 return 1
 `)
 
-// Lua脚本：原子性处理订单取消（解冻资产 + 删除索引）
-// KEYS[1]: balanceKey (balance:{uid})
-// KEYS[2]: openOrdersKey (open_orders:{uid}:{symbol})
-// KEYS[3]: idempotentKey (match_processed:cancel:{message_id})
+// Lua脚本：原子性处理订单取消（解冻资产 + 删除活跃快照）
+// KEYS[1]: balanceKey (balance:{tag}:uid)
+// KEYS[2]: activeOrdersKey (orders:active:{tag}:uid)
+// KEYS[3]: idempotentKey (match_processed:cancel:{id}:{tag})
 // ARGV[1]: frozenField (冻结字段)
 // ARGV[2]: availField (可用字段)
 // ARGV[3]: amount (解冻数量, int64)
@@ -110,11 +108,11 @@ var atomicCancelScript = redis.NewScript(`
 if redis.call("EXISTS", KEYS[3]) == 1 then
     return 1
 end
--- 1. 解冻
+-- 1. 解冻资金
 redis.call("HINCRBY", KEYS[1], ARGV[1], -tonumber(ARGV[3]))
 redis.call("HINCRBY", KEYS[1], ARGV[2], tonumber(ARGV[3]))
--- 2. 删除索引
-redis.call("ZREM", KEYS[2], ARGV[4])
+-- 2. 删除活跃订单快照
+redis.call("HDEL", KEYS[2], ARGV[4])
 -- 3. 标记已处理
 redis.call("SET", KEYS[3], "1", "EX", ARGV[5])
 return 1
@@ -234,9 +232,9 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 	tagMaker := l.getTag(maker.Uid)
 	takerBalanceKey := fmt.Sprintf("balance:%s:%d", tagTaker, taker.Uid)
 	makerBalanceKey := fmt.Sprintf("balance:%s:%d", tagMaker, maker.Uid)
-	takerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", taker.Uid, symbolName)
-	makerOpenOrdersKey := fmt.Sprintf("open_orders:%d:%s", maker.Uid, symbolName)
-	idempotentKey := fmt.Sprintf("match_processed:%s", record.MatchSubId)
+	takerOpenOrdersKey := fmt.Sprintf("open_orders:%s:%d:%s", tagTaker, taker.Uid, symbolName)
+	makerOpenOrdersKey := fmt.Sprintf("open_orders:%s:%d:%s", tagMaker, maker.Uid, symbolName)
+	idempotentKey := fmt.Sprintf("match_processed:%s:%s", record.MatchSubId, tagTaker)
 
 	return []interface{}{
 		takerBalanceKey,          // offset + 1
@@ -283,32 +281,24 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 		return fmt.Errorf("convert amount failed: %w", err)
 	}
 
-	// 3. 构建订单 ID
-	// 策略：限价单(2) + 方向 + ID
-	orderId := fmt.Sprintf("%d%d%d", 2, int32(res.Side), res.Id)
-
-	// 4. 处理资产解冻
+	// 3. 处理资产解冻及各类索引清理 (原子 Lua 脚本)
 	tag := l.getTag(res.Uid)
 	balanceKey := fmt.Sprintf("balance:%s:%d", tag, res.Uid)
-	idempotentKey := fmt.Sprintf("match_processed:cancel:%d", messageId)
+	activeOrdersKey := fmt.Sprintf("orders:active:%s:%d", tag, res.Uid)
+	idempotentKey := fmt.Sprintf("match_processed:cancel:%d:%s", messageId, tag)
 
-	// 后续如果协议更新，可以将 dummy 替换为真实 key。
-	if symbolName == "" {
-		symbolName = "dummy"
-	}
-	openOrdersKey := fmt.Sprintf("open_orders:%d:%s", res.Uid, symbolName)
-	keys := []string{balanceKey, openOrdersKey, idempotentKey}
+	keys := []string{balanceKey, activeOrdersKey, idempotentKey}
 	args := []interface{}{
-		coinName + "_frozen",
-		coinName,
-		unfreezeAmount,
-		orderId,
-		3600 * 24,
+		coinName + "_frozen", // ARGV[1]
+		coinName,              // ARGV[2]
+		unfreezeAmount,        // ARGV[3]
+		res.OrderId,           // ARGV[4]
+		3600 * 24,             // ARGV[5]
 	}
 
 	_, err = atomicCancelScript.Run(ctx, l.svcCtx.RedisCli, keys, args...).Result()
 	if err != nil {
-		return fmt.Errorf("execute cancel script failed: %w", err)
+		return fmt.Errorf("execute atomicCancelScript failed: %w", err)
 	}
 
 	if err := storeConsumedMessageId(); err != nil {
@@ -321,9 +311,9 @@ func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.Accepte
 	res := acceptResult
 	ctx := context.Background()
 
-	openOrdersKey := define.OpenOrder.WithParams(cast.ToString(res.Uid))
-
-	idempotentKey := define.AccountMatchProcessed.WithParams(cast.ToString(messageId))
+	tag := l.getTag(res.Uid)
+	openOrdersKey := fmt.Sprintf("open_orders:%s:%d:%s", tag, res.Uid, res.SymbolName)
+	idempotentKey := fmt.Sprintf("match_processed:accept:%d:%s", messageId, tag)
 
 	keys := []string{openOrdersKey, idempotentKey}
 	args := []interface{}{

@@ -214,8 +214,10 @@ type CancelResult struct {
 	//数量 取消买单则为计价币数量，取消卖单则为基础币数量
 	Amount string
 	//用户id
-	Uid int64
-	Ts  int64
+	Uid       int64
+	Ts        int64
+	Side      enum.Side
+	OrderType enum.OrderType
 }
 
 func (c *CancelResult) dump() {
@@ -987,10 +989,13 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 		}
 		m.SendResult(&MatchOutputMessage{
 			CancelResult: &CancelResult{
-				CancelId: inputMsg.OrderPkId,
-				CoinId:   coinId,
-				Amount:   qty,
-				Uid:      orderDetail.Uid,
+				CancelId:  inputMsg.OrderPkId,
+				CoinId:    coinId,
+				Amount:    qty,
+				Uid:       orderDetail.Uid,
+				Ts:        0,
+				Side:      inputMsg.Side,
+				OrderType: inputMsg.OrderType,
 			},
 			MsgType: MsgTypeCancelResult,
 			MsgId:   m.currentMsgId,
@@ -1137,10 +1142,14 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 	case MsgTypeCancelResult:
 		resp.Result = &matchMq.MatchOutput_CancelResult{
 			CancelResult: &matchMq.CancelResult{
-				Id:     matchMsg.CancelResult.CancelId,
-				CoinId: matchMsg.CancelResult.CoinId,
-				Amount: matchMsg.CancelResult.Amount,
-				Uid:    matchMsg.CancelResult.Uid,
+				OrderId:   cast.ToString(int32(matchMsg.CancelResult.OrderType)) + cast.ToString(int32(matchMsg.CancelResult.Side)) + cast.ToString(matchMsg.CancelResult.CancelId),
+				Id:        matchMsg.CancelResult.CancelId,
+				CoinId:    matchMsg.CancelResult.CoinId,
+				Amount:    matchMsg.CancelResult.Amount,
+				Price:     "",
+				Uid:       matchMsg.CancelResult.Uid,
+				Side:      matchMsg.CancelResult.Side,
+				OrderType: matchMsg.CancelResult.OrderType,
 			},
 		}
 		logx.Infof("send cancel result %+v to topic %s", &resp, m.producer.Topic())
