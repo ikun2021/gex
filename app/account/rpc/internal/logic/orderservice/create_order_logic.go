@@ -114,33 +114,34 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	if err != nil {
 		return nil, errs.WarpMessage(errs.ParamValidateFailed, "price invalid")
 	}
+
 	parts := strings.Split(in.SymbolName, "_")
 	if len(parts) != 2 {
 		return &pb.OrderEmpty{}, errors.New("invalid symbol format")
 	}
 	baseCcy, quoteCcy := parts[0], parts[1]
 
+	price, err = decimal.NewFromString(in.Price)
+	if err != nil {
+		return nil, errs.WarpMessage(errs.ParamValidateFailed, "price invalid")
+	}
+	baseAmount, err = decimal.NewFromString(in.BaseAmount)
+	if err != nil {
+		return nil, errs.WarpMessage(errs.ParamValidateFailed, "baseAmount invalid")
+	}
+
 	if in.OrderType == enum.OrderType_LO {
-		price, err = decimal.NewFromString(in.Price)
-		if err != nil {
-			return nil, errs.WarpMessage(errs.ParamValidateFailed, "price invalid")
-		}
-		quoteAmount = price.Mul(baseAmount)
 		if in.Side == enum.Side_Buy {
 			// 买入: 冻结 Quote Currency (如 USDT)
-			totalCost := price.Mul(baseAmount)
 			freezeCurrency = quoteCcy
-			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, totalCost.String())
+			quoteAmount = price.Mul(baseAmount)
+			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, quoteAmount.String())
 		} else {
 			// 卖出: 冻结 Base Currency (如 BTC)
 			freezeCurrency = baseCcy
 			freezeAmountInt, err = utils.ToDBInteger(freezeCurrency, baseAmount.String())
 		}
 	} else {
-		quoteAmount, err = decimal.NewFromString(in.QuoteAmount)
-		if err != nil {
-			return nil, errs.WarpMessage(errs.ParamValidateFailed, "quote amount invalid")
-		}
 		if in.Side == enum.Side_Buy {
 			// 买入: 冻结 Quote Currency (如 USDT)
 			freezeCurrency = quoteCcy

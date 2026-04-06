@@ -1,8 +1,6 @@
 package errs
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 	"google.golang.org/grpc/codes"
@@ -39,8 +37,4 @@ func (c Code) Error(msg string) error {
 
 func (c Code) String() string {
 	return ""
-}
-
-func (c Code) DtmErrorMsg() string {
-	return fmt.Sprintf("=%d=", int32(c))
 }
