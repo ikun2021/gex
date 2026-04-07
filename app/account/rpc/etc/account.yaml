@@ -12,28 +12,31 @@ Symbol:
     Id: 1
     BaseCoin: IKUN
     QuoteCoin: USDT
-    QuoteCoinId: 1
-    BaseCoinId: 2
+    QuoteCoinId: 4
+    BaseCoinId: 1
     QuoteCoinPrec: 4
     BaseCoinPrec: 4
   - Name: ETH_USDT
     Id: 2
     BaseCoin: ETH
     QuoteCoin: USDT
-    QuoteCoinId: 1
-    BaseCoinId: 2
+    QuoteCoinId: 4
+    BaseCoinId: 3
     QuoteCoinPrec: 4
     BaseCoinPrec: 4
 Coin:
   - Name: IKUN
     Id: 1
-    Precision: 6
-  - Name: USDT
+    Precision: 4
+  - Name: BTC
     Id: 2
-    Precision: 6
+    Precision: 4
   - Name: ETH
     Id: 3
-    Precision: 6
+    Precision: 4
+  - Name: USDT
+    Id: 4
+    Precision: 4
 
 
 GormConf:

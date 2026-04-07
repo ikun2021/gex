@@ -1146,7 +1146,6 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 				Id:        matchMsg.CancelResult.CancelId,
 				CoinId:    matchMsg.CancelResult.CoinId,
 				Amount:    matchMsg.CancelResult.Amount,
-				Price:     "",
 				Uid:       matchMsg.CancelResult.Uid,
 				Side:      matchMsg.CancelResult.Side,
 				OrderType: matchMsg.CancelResult.OrderType,
