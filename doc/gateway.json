@@ -451,7 +451,10 @@
       }
     },
     "/order/v1/get_order_list": {
-      "get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -475,10 +478,11 @@
               ],
               "properties": {
                 "id": {
+                  "description": "分页游标，上一页最后一条订单主键ID",
                   "type": "string"
                 },
                 "page_size": {
-                  "description": "分页偏远量",
+                  "description": "分页偏移量",
                   "type": "integer"
                 },
                 "status_list": {
@@ -489,7 +493,7 @@
                   }
                 },
                 "symbol_name": {
-                  "description": "状态",
+                  "description": "交易对",
                   "type": "string"
                 }
               }
@@ -972,7 +976,7 @@
       }
     }
   },
-  "x-date": "2026-02-25 21:48:36",
+  "x-date": "2026-05-16 16:20:48",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

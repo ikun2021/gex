@@ -13,10 +13,10 @@ type CancelOrderReq {
 }
 
 type GetOrderListReq {
-    Status []int32 `json:"status_list"`    //状态
-    SymbolName string `json:"symbol_name"` //状态
-    PageSize int64 `json:"page_size"`      //分页偏远量
-    Id string `json:"id"`
+    Status []int32 `json:"status_list"`       //状态
+    SymbolName string `json:"symbol_name"`   //交易对
+    PageSize int64 `json:"page_size"`        //分页偏移量
+    Id string `json:"id"`                   //分页游标，上一页最后一条订单主键ID
 }
 
 type (
@@ -54,5 +54,5 @@ service gateway {
     post /cancel_order (CancelOrderReq) returns (Empty)
     @doc "获取用户订单列表"
     @handler GetOrderList
-    get /get_order_list (GetOrderListReq) returns (GetOrderListResp)
+    post /get_order_list (GetOrderListReq) returns (GetOrderListResp)
 }

@@ -1,0 +1,1165 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "管理后台",
+    "description": "管理后台",
+    "version": "v1"
+  },
+  "host": "api.gex.com",
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/admin/v1/add_coin": {
+      "post": {
+        "summary": "新增币种",
+        "operationId": "AddCoin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AddCoinResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AddCoinReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/add_error_code": {
+      "post": {
+        "summary": "新增错误码",
+        "operationId": "AddErrorCode",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AddErrorCodeReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/add_symbol": {
+      "post": {
+        "summary": "新增交易对",
+        "operationId": "AddSymbol",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AddSymbolResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AddSymbolReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/get_coin_list": {
+      "get": {
+        "summary": "币种列表",
+        "operationId": "GetCoinList",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetCoinListResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page_no",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/get_error_code_list": {
+      "get": {
+        "summary": "获取错误码列表",
+        "operationId": "GetErrorCodeList",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetErrorCodeListResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "language",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/get_match_list": {
+      "post": {
+        "summary": "获取撮合列表",
+        "operationId": "GetMatchList",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetMatchListResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetMatchListReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/get_service_config": {
+      "post": {
+        "summary": "获取服务配置",
+        "operationId": "GetServiceConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetServiceConfigResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetServiceConfigReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/get_symbol_list": {
+      "get": {
+        "summary": "获取交易对列表",
+        "operationId": "GetSymbolList",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetSymbolListResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page_no",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/login": {
+      "post": {
+        "summary": "管理员登录",
+        "operationId": "Login",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/LoginResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LoginReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/register": {
+      "post": {
+        "summary": "管理员注册",
+        "operationId": "Register",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RegisterReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/sync_coin_config": {
+      "post": {
+        "summary": "同步币种配置",
+        "operationId": "SyncCoinConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/sync_error_code": {
+      "post": {
+        "summary": "同步错误码",
+        "operationId": "SyncErrorCode",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/sync_symbol_config": {
+      "post": {
+        "summary": "同步交易对配置",
+        "operationId": "SyncSymbolConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/update_coin": {
+      "post": {
+        "summary": "修改币种",
+        "operationId": "UpdateCoin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateCoinReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/update_error_code": {
+      "post": {
+        "summary": "修改错误码",
+        "operationId": "UpdateErrorCode",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateErrorCodeReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/update_symbol": {
+      "post": {
+        "summary": "修改交易对",
+        "operationId": "UpdateSymbol",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/UpdateSymbolResp"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateSymbolReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/v1/upsert_service_config": {
+      "post": {
+        "summary": "添加/更新服务的配置",
+        "operationId": "UpsertServiceConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpsertServiceConfigReq"
+            }
+          }
+        ],
+        "requestBody": {},
+        "tags": [
+          "Admin"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "AddCoinReq": {
+      "type": "object",
+      "properties": {
+        "coin_name": {
+          "type": "string"
+        },
+        "prec": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "coin_id": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "AddCoinReq",
+      "required": [
+        "coin_name",
+        "prec",
+        "coin_id"
+      ]
+    },
+    "AddCoinResp": {
+      "type": "object",
+      "title": "AddCoinResp"
+    },
+    "AddErrorCodeReq": {
+      "type": "object",
+      "properties": {
+        "error_code_name": {
+          "type": "string"
+        },
+        "error_code_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "language": {
+          "type": "string"
+        }
+      },
+      "title": "AddErrorCodeReq",
+      "required": [
+        "error_code_name",
+        "error_code_id",
+        "language"
+      ]
+    },
+    "AddSymbolReq": {
+      "type": "object",
+      "properties": {
+        "base_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "quote_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "symbol_id": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "AddSymbolReq",
+      "required": [
+        "base_coin_id",
+        "quote_coin_id",
+        "symbol_id"
+      ]
+    },
+    "AddSymbolResp": {
+      "type": "object",
+      "title": "AddSymbolResp"
+    },
+    "CoinInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "coin_name": {
+          "type": "string"
+        },
+        "coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "prec": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "CoinInfo",
+      "required": [
+        "id",
+        "coin_name",
+        "coin_id",
+        "prec"
+      ]
+    },
+    "Empty": {
+      "type": "object",
+      "title": "Empty"
+    },
+    "ErrorCode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "error_code_name": {
+          "type": "string"
+        },
+        "error_code_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "language": {
+          "type": "string"
+        }
+      },
+      "title": "ErrorCode",
+      "required": [
+        "id",
+        "error_code_name",
+        "error_code_id",
+        "language"
+      ]
+    },
+    "GetCoinListReq": {
+      "type": "object",
+      "properties": {
+        "page_no": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "page_size": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetCoinListReq",
+      "required": [
+        "page_no",
+        "page_size"
+      ]
+    },
+    "GetCoinListResp": {
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CoinInfo"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetCoinListResp",
+      "required": [
+        "list",
+        "total"
+      ]
+    },
+    "GetErrorCodeListReq": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string"
+        }
+      },
+      "title": "GetErrorCodeListReq",
+      "required": [
+        "language"
+      ]
+    },
+    "GetErrorCodeListResp": {
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ErrorCode"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetErrorCodeListResp",
+      "required": [
+        "list",
+        "total"
+      ]
+    },
+    "GetMatchListReq": {
+      "type": "object",
+      "properties": {
+        "page_no": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "page_size": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetMatchListReq",
+      "required": [
+        "page_no",
+        "page_size"
+      ]
+    },
+    "GetMatchListResp": {
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MatchInfo"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetMatchListResp",
+      "required": [
+        "list",
+        "total"
+      ]
+    },
+    "GetServiceConfigReq": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "title": "GetServiceConfigReq",
+      "required": [
+        "key"
+      ]
+    },
+    "GetServiceConfigResp": {
+      "type": "object",
+      "properties": {
+        "config_data": {
+          "type": "string"
+        }
+      },
+      "title": "GetServiceConfigResp",
+      "required": [
+        "config_data"
+      ]
+    },
+    "GetSymbolListReq": {
+      "type": "object",
+      "properties": {
+        "page_no": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "page_size": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetSymbolListReq",
+      "required": [
+        "page_no",
+        "page_size"
+      ]
+    },
+    "GetSymbolListResp": {
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SymbolInfo"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "GetSymbolListResp",
+      "required": [
+        "list",
+        "total"
+      ]
+    },
+    "LoginReq": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "title": "LoginReq",
+      "required": [
+        "username",
+        "password"
+      ]
+    },
+    "LoginResp": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "expire": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "user_info": {
+          "$ref": "#/definitions/UserInfo"
+        }
+      },
+      "title": "LoginResp",
+      "required": [
+        "token",
+        "expire",
+        "user_info"
+      ]
+    },
+    "MatchInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "match_id": {
+          "type": "string"
+        },
+        "symbol_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "symbol_name": {
+          "type": "string"
+        },
+        "total_qty": {
+          "type": "string"
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "avg_price": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sub_match_info_list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SubMatchInfo"
+          }
+        }
+      },
+      "title": "MatchInfo",
+      "required": [
+        "id",
+        "match_id",
+        "symbol_id",
+        "symbol_name",
+        "total_qty",
+        "total_amount",
+        "avg_price",
+        "created_at",
+        "sub_match_info_list"
+      ]
+    },
+    "RegisterReq": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "comfirm_password": {
+          "type": "string"
+        }
+      },
+      "title": "RegisterReq",
+      "required": [
+        "username",
+        "password",
+        "comfirm_password"
+      ]
+    },
+    "SubMatchInfo": {
+      "type": "object",
+      "properties": {
+        "taker_user_id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "maker_user_id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "match_price": {
+          "type": "string"
+        },
+        "match_qty": {
+          "type": "string"
+        },
+        "match_amount": {
+          "type": "string"
+        },
+        "match_time": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "title": "SubMatchInfo",
+      "required": [
+        "taker_user_id",
+        "maker_user_id",
+        "match_price",
+        "match_qty",
+        "match_amount",
+        "match_time"
+      ]
+    },
+    "SymbolInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "symbol_name": {
+          "type": "string"
+        },
+        "symbol_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "base_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "base_coin_name": {
+          "type": "string"
+        },
+        "base_coin_prec": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "quote_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "quote_coin_name": {
+          "type": "string"
+        },
+        "quote_prec": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "SymbolInfo",
+      "required": [
+        "id",
+        "symbol_name",
+        "symbol_id",
+        "base_coin_id",
+        "base_coin_name",
+        "base_coin_prec",
+        "quote_coin_id",
+        "quote_coin_name",
+        "quote_prec"
+      ]
+    },
+    "UpdateCoinReq": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "coin_name": {
+          "type": "string"
+        },
+        "prec": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "coin_id": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "UpdateCoinReq",
+      "required": [
+        "id",
+        "coin_name",
+        "prec",
+        "coin_id"
+      ]
+    },
+    "UpdateErrorCodeReq": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "error_code_name": {
+          "type": "string"
+        },
+        "error_code_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "language": {
+          "type": "string"
+        }
+      },
+      "title": "UpdateErrorCodeReq",
+      "required": [
+        "id",
+        "error_code_name",
+        "error_code_id",
+        "language"
+      ]
+    },
+    "UpdateSymbolReq": {
+      "type": "object",
+      "properties": {
+        "symbol_name": {
+          "type": "string"
+        },
+        "base_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "base_coin_name": {
+          "type": "string"
+        },
+        "base_coin_prec": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "quote_coin_id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "quote_coin_name": {
+          "type": "string"
+        },
+        "quote_prec": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "UpdateSymbolReq",
+      "required": [
+        "symbol_name",
+        "base_coin_id",
+        "base_coin_name",
+        "base_coin_prec",
+        "quote_coin_id",
+        "quote_coin_name",
+        "quote_prec"
+      ]
+    },
+    "UpdateSymbolResp": {
+      "type": "object",
+      "title": "UpdateSymbolResp"
+    },
+    "UploadTemplateFileReq": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "description": "服务名"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "交易对"
+        }
+      },
+      "title": "UploadTemplateFileReq",
+      "required": [
+        "service_name",
+        "symbol"
+      ]
+    },
+    "UpsertServiceConfigReq": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "交易对"
+        },
+        "config_data": {
+          "type": "string",
+          "description": "配置"
+        }
+      },
+      "title": "UpsertServiceConfigReq",
+      "required": [
+        "key",
+        "config_data"
+      ]
+    },
+    "UserInfo": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "title": "UserInfo",
+      "required": [
+        "username",
+        "user_id"
+      ]
+    }
+  },
+  "securityDefinitions": {
+    "apiKey": {
+      "type": "apiKey",
+      "description": "Enter JWT Bearer token **_only_**",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ]
+}

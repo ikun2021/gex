@@ -63,9 +63,9 @@ type GetDepthResp struct {
 
 type GetOrderListReq struct {
 	Status     []int32 `json:"status_list"` //状态
-	SymbolName string  `json:"symbol_name"` //状态
-	PageSize   int64   `json:"page_size"`   //分页偏远量
-	Id         string  `json:"id"`
+	SymbolName string  `json:"symbol_name"` //交易对
+	PageSize   int64   `json:"page_size"`   //分页偏移量
+	Id         string  `json:"id"`          //分页游标，上一页最后一条订单主键ID
 }
 
 type GetOrderListResp struct {

@@ -82,7 +82,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 			{
 				// 获取用户订单列表
-				Method:  http.MethodGet,
+				Method:  http.MethodPost,
 				Path:    "/get_order_list",
 				Handler: order.GetOrderListHandler(serverCtx),
 			},

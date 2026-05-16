@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/ikun2021/gex/app/account/rpc/internal/logic"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	logger "github.com/ikun2021/zlog"
@@ -28,24 +29,47 @@ func InitConsumer(sc *svc.ServiceContext) {
 				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
 					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 					if err := c.Ack(message); err != nil {
-						logx.Errorw("handler message failed", logger.ErrorField(err))
+						logx.Errorw("ack message failed", logger.ErrorField(err))
 					}
 					continue
 				}
+
+				h := logic.NewHandleMatchResultLogic(sc)
+				var handleErr error
 				switch msg := m.Result.(type) {
 				case *matchMq.MatchOutput_MatchResult:
-					// 下单成功
+					handleErr = h.HandleMatchResult(msg, func() error {
+						return c.Ack(message)
+					})
 				case *matchMq.MatchOutput_CancelResult:
-					// 取消订单成功
 					Cancel(sc, msg, m.MessageId)
+					if err := c.Ack(message); err != nil {
+						logx.Errorw("ack cancel message failed", logger.ErrorField(err))
+					}
+					continue
 				case *matchMq.MatchOutput_AcceptedResult:
-					// 订单被接受
+					handleErr = h.HandleAcceptOrder(msg.AcceptedResult, m.MessageId)
+					if handleErr == nil {
+						if err := c.Ack(message); err != nil {
+							logx.Errorw("ack accept message failed", logger.ErrorField(err))
+						}
+					}
+					continue
+				default:
+					if err := c.Ack(message); err != nil {
+						logx.Errorw("ack unknown message failed", logger.ErrorField(err))
+					}
+					continue
 				}
-				logx.Debugf("match result %v", &m)
 
+				if handleErr != nil {
+					logx.Errorw("handle match output failed",
+						logx.Field("messageId", m.MessageId),
+						logger.ErrorField(handleErr))
+					continue
+				}
+				logx.Debugf("match result handled messageId=%d", m.MessageId)
 			}
-
 		}(consumer)
 	}
-
 }

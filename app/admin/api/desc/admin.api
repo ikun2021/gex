@@ -1,18 +1,18 @@
 syntax = "v1"
 
-info(
-	title: "管理后台"
-	desc: "管理后台"
-	author: "Mikael"
-	email: "12123231@163.com"
+info (
+	title:   "管理后台"
+	desc:    "管理后台"
+	author:  "Mikael"
+	email:   "12123231@163.com"
 	version: "v1"
 )
-type Empty {
-}
+
+type Empty {}
 
 type (
 	UpsertServiceConfigReq {
-		Key        string `json:"key"`         //交易对
+		Key        string `json:"key"` //交易对
 		ConfigData string `json:"config_data"` //配置
 	}
 )
@@ -29,8 +29,8 @@ type (
 type (
 	UploadTemplateFileReq {
 		ServiceName string `form:"service_name"` //服务名
-		Symbol      string `form:"symbol"`       //交易对
-		//Template file form template
+		Symbol      string `form:"symbol"` //交易对
+	//Template file form template
 	}
 )
 
@@ -38,7 +38,7 @@ type (
 	LoginReq {
 		Username string `json:"username"`
 		Password string `json:"password"`
-		//	Captcha  string `json:"captcha"`
+	// Captcha  string `json:"captcha"`
 	}
 	UserInfo {
 		Username string `json:"username"`
@@ -87,8 +87,7 @@ type (
 		QuoteCoinID int32 `json:"quote_coin_id"`
 		SymbolId    int32 `json:"symbol_id"`
 	}
-	AddSymbolResp {
-	}
+	AddSymbolResp  {}
 )
 
 type (
@@ -97,9 +96,9 @@ type (
 		Prec     int32  `json:"prec"`
 		CoinId   int32  `json:"coin_id"`
 	}
-	AddCoinResp {
-	}
+	AddCoinResp  {}
 )
+
 type (
 	GetCoinListReq {
 		PageNo   int64 `form:"page_no"`
@@ -116,6 +115,7 @@ type (
 		Total int64       `json:"total"`
 	}
 )
+
 type (
 	UpdateSymbolReq {
 		SymbolName    string `json:"symbol_name"`
@@ -126,8 +126,7 @@ type (
 		QuoteCoinName string `json:"quote_coin_name"`
 		QuotePrec     int32  `json:"quote_prec"`
 	}
-	UpdateSymbolResp {
-	}
+	UpdateSymbolResp  {}
 )
 
 type (
@@ -143,6 +142,7 @@ type (
 		Language string `form:"language"`
 	}
 )
+
 type (
 	ErrorCode {
 		Id            uint32 `json:"id"`
@@ -173,6 +173,7 @@ type (
 		CoinId   int32  `json:"coin_id"`
 	}
 )
+
 type (
 	GetMatchListReq {
 		PageNo   int64 `json:"page_no"`
@@ -202,73 +203,77 @@ type (
 		Total int64        `json:"total"`
 	}
 )
-@server(
+
+@server (
 	prefix: /admin/v1
 )
 service Admin {
 	@doc "添加/更新服务的配置"
 	@handler UpsertServiceConfig
 	post /upsert_service_config (UpsertServiceConfigReq) returns (Empty)
-	
+
 	@doc "获取服务配置"
 	@handler GetServiceConfig
 	post /get_service_config (GetServiceConfigReq) returns (GetServiceConfigResp)
-	
+
 	@doc "管理员登录"
 	@handler Login
 	post /login (LoginReq) returns (LoginResp)
-	
+
 	@doc "管理员注册"
 	@handler Register
 	post /register (RegisterReq) returns (Empty)
-	
+
 	@doc "获取交易对列表"
 	@handler GetSymbolList
 	get /get_symbol_list (GetSymbolListReq) returns (GetSymbolListResp)
-	
+
 	@doc "新增交易对"
 	@handler AddSymbol
 	post /add_symbol (AddSymbolReq) returns (AddSymbolResp)
-	
+
 	@doc "修改交易对"
 	@handler UpdateSymbol
 	post /update_symbol (UpdateSymbolReq) returns (UpdateSymbolResp)
-	
+
 	@doc "新增币种"
 	@handler AddCoin
 	post /add_coin (AddCoinReq) returns (AddCoinResp)
-	
+
 	@doc "修改币种"
 	@handler UpdateCoin
 	post /update_coin (UpdateCoinReq) returns (Empty)
-	
+
 	@doc "币种列表"
 	@handler GetCoinList
 	get /get_coin_list (GetCoinListReq) returns (GetCoinListResp)
-	
+
 	@doc "新增错误码"
 	@handler AddErrorCode
 	post /add_error_code (AddErrorCodeReq) returns (Empty)
-	
+
 	@doc "获取错误码列表"
 	@handler GetErrorCodeList
 	get /get_error_code_list (GetErrorCodeListReq) returns (GetErrorCodeListResp)
-	
+
 	@doc "修改错误码"
 	@handler UpdateErrorCode
 	post /update_error_code (UpdateErrorCodeReq) returns (Empty)
-	
+
 	@doc "同步错误码"
 	@handler SyncErrorCode
 	post /sync_error_code (Empty) returns (Empty)
-	
+
 	@doc "同步币种配置"
 	@handler SyncCoinConfig
 	post /sync_coin_config (Empty) returns (Empty)
+
 	@doc "同步交易对配置"
 	@handler SyncSymbolConfig
 	post /sync_symbol_config (Empty) returns (Empty)
+
 	@doc "获取撮合列表"
 	@handler GetMatchList
 	post /get_match_list (GetMatchListReq) returns (GetMatchListResp)
 }
+

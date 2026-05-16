@@ -180,6 +180,8 @@ message GetOrderListByUserReq {
   int64 id=3;
   //分页数据偏移量
   int64 page_size=4;
+  //交易对，空则不过滤
+  string symbol_name=5;
 
 }
 // 订单实体

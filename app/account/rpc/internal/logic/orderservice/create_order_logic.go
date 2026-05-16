@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ikun2021/gex/common/errs"
+	"github.com/ikun2021/gex/common/rediskeys"
 
 	"time"
 
@@ -33,13 +34,14 @@ const OrderCacheTTL = 600
 // 1. 原子性：检查余额、扣减资金、写入发件箱、记录快照在一个事务中完成。
 // 2. 幂等性：使用 idempotencyKey 防止重复下单。
 // 3. 集群兼容：通过 {slotId} hash-tag 确保相关的所有 Key 落在同一个分片上。
-// KEYS: [balanceKey, streamKey, activeOrdersKey, idempotencyKey]
-// ARGV: [availField, frozenField, amount, streamData, orderId, orderInfoData, expireTime]
+// KEYS: [balanceKey, streamKey, activeOrdersKey, idempotencyKey, openOrdersKey]
+// ARGV: [availField, frozenField, amount, streamData, orderId, orderInfoData, expireTime, seqId]
 var atomicOrderScript = redis.NewScript(`
 local balanceKey      = KEYS[1]
 local streamKey       = KEYS[2]
 local activeOrdersKey = KEYS[3]
 local idempotencyKey  = KEYS[4]
+local openOrdersKey   = KEYS[5]
 
 local availField      = ARGV[1]
 local frozenField     = ARGV[2]
@@ -48,6 +50,7 @@ local streamData      = ARGV[4]
 local orderId         = ARGV[5]
 local orderInfoData   = ARGV[6]
 local expireTime      = ARGV[7]
+local seqId           = ARGV[8]
 
 -- 1. 幂等检查
 if redis.call("EXISTS", idempotencyKey) == 1 then
@@ -80,7 +83,10 @@ redis.call("HINCRBY", balanceKey, frozenField, changeAmount)
 -- 4.3 写入活跃订单快照
 redis.call("HSET", activeOrdersKey, orderId, orderInfoData)
 
--- 4.4 标记幂等
+-- 4.4 写入有序索引（score 为雪花 id，便于按 id 游标分页）
+redis.call("ZADD", openOrdersKey, seqId, orderId)
+
+-- 4.5 标记幂等
 redis.call("SET", idempotencyKey, "1", "EX", expireTime)
 
 return 1 -- 成功
@@ -213,16 +219,15 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 	orderInfoDataStr := string(orderInfoDataBytes)
 
 	// 6. 准备 Lua 脚本参数 (使用 slotId 分桶 HashTag 保证 Redis Cluster 集群原子性并限制 Stream 数量)
-	const MaxSlots = 16384
-	slotId := in.UserId % MaxSlots
-	tag := fmt.Sprintf("{%d}", slotId)
+	tag := rediskeys.UserSlotTag(in.UserId)
 
-	balanceKey := fmt.Sprintf("balance:%s:%d", tag, in.UserId)
-	activeOrdersKey := fmt.Sprintf("orders:active:%s:%d", tag, in.UserId)
+	balanceKey := rediskeys.UserBalanceKey(tag, in.UserId)
+	activeOrdersKey := rediskeys.UserActiveOrdersKey(tag, in.UserId)
+	openOrdersKey := rediskeys.UserOpenOrdersKey(tag, in.UserId)
 	streamKey := fmt.Sprintf("%s_%s:%s", StreamKeyMQOutbox, in.SymbolName, tag) // 同一 Slot 的分桶 Stream
 	idempotencyKey := fmt.Sprintf("req:order:%s:%s", orderId, tag)
 
-	keys := []string{balanceKey, streamKey, activeOrdersKey, idempotencyKey}
+	keys := []string{balanceKey, streamKey, activeOrdersKey, idempotencyKey, openOrdersKey}
 	args := []interface{}{
 		freezeCurrency,             // ARGV[1] availField
 		freezeCurrency + "_frozen", // ARGV[2] frozenField
@@ -231,9 +236,10 @@ func (l *CreateOrderLogic) CreateOrder(in *pb.CreateOrderReq) (*pb.OrderEmpty, e
 		orderId,                    // ARGV[5] orderId
 		orderInfoDataStr,           // ARGV[6] orderInfoData
 		86400,                      // ARGV[7] expireTime
+		seqId,                      // ARGV[8] seqId
 	}
 
-	res, err := atomicOrderScript.Run(l.ctx, l.svcCtx.RedisCli, keys, args...).Result()
+	res, err := atomicOrderScript.Run(context.Background(), l.svcCtx.RedisCli, keys, args...).Result()
 	if err != nil {
 		logx.Errorw("Execute redis lua failed", logx.Field("err", err))
 		return nil, err
