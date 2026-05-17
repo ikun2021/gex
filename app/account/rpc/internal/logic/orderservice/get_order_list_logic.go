@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ikun2021/gex/app/account/rpc/internal/dao/mongodao"
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
 	"github.com/ikun2021/gex/common/proto/enum"
@@ -29,20 +30,78 @@ func NewGetOrderListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetO
 	}
 }
 
-// GetOrderList 基于 open_orders 有序索引（score=雪花id）按 id 游标倒序分页，详情从 orders:active 读取。
+// GetOrderList 当前委托从 Redis 查询；历史委托（全部成交/撤销/废弃）从 MongoDB order_final 查询。
 func (l *GetOrderListLogic) GetOrderList(in *pb.GetOrderListByUserReq) (*pb.GetOrderListByUserResp, error) {
+	pageSize := in.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+
+	activeStatuses, terminalStatuses := splitOrderStatuses(in.StatusList)
+	if len(terminalStatuses) > 0 && len(activeStatuses) == 0 {
+		return l.getHistoryOrderList(in, terminalStatuses, pageSize)
+	}
+	return l.getActiveOrderList(in, activeStatuses, pageSize)
+}
+
+func splitOrderStatuses(statusList []enum.OrderStatus) (active, terminal []enum.OrderStatus) {
+	for _, s := range statusList {
+		if mongodao.IsTerminalStatus(s) {
+			terminal = append(terminal, s)
+		} else {
+			active = append(active, s)
+		}
+	}
+	return active, terminal
+}
+
+func (l *GetOrderListLogic) getHistoryOrderList(in *pb.GetOrderListByUserReq, statuses []enum.OrderStatus, pageSize int64) (*pb.GetOrderListByUserResp, error) {
+	if l.svcCtx.OrderFinalRepo == nil {
+		return nil, fmt.Errorf("order final repo not configured")
+	}
+
+	statusInts := make([]int32, 0, len(statuses))
+	for _, s := range statuses {
+		statusInts = append(statusInts, int32(s))
+	}
+
+	q := mongodao.OrderFinalListQuery{
+		UserID:     in.UserId,
+		StatusList: statusInts,
+		SymbolName: in.SymbolName,
+		CursorID:   in.Id,
+		PageSize:   pageSize,
+	}
+
+	total, err := l.svcCtx.OrderFinalRepo.CountByUser(l.ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("count history orders failed: %w", err)
+	}
+
+	docs, err := l.svcCtx.OrderFinalRepo.ListByUser(l.ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("list history orders failed: %w", err)
+	}
+
+	orders := make([]*pb.Order, 0, len(docs))
+	for _, doc := range docs {
+		orders = append(orders, orderFinalToOrder(doc))
+	}
+
+	return &pb.GetOrderListByUserResp{
+		OrderList: orders,
+		Total:     total,
+	}, nil
+}
+
+func (l *GetOrderListLogic) getActiveOrderList(in *pb.GetOrderListByUserReq, statuses []enum.OrderStatus, pageSize int64) (*pb.GetOrderListByUserResp, error) {
 	tag := rediskeys.UserSlotTag(in.UserId)
 	openOrdersKey := rediskeys.UserOpenOrdersKey(tag, in.UserId)
 	activeOrdersKey := rediskeys.UserActiveOrdersKey(tag, in.UserId)
 
-	statusSet := make(map[enum.OrderStatus]struct{}, len(in.StatusList))
-	for _, s := range in.StatusList {
+	statusSet := make(map[enum.OrderStatus]struct{}, len(statuses))
+	for _, s := range statuses {
 		statusSet[s] = struct{}{}
-	}
-
-	pageSize := in.PageSize
-	if pageSize <= 0 {
-		pageSize = 20
 	}
 
 	total, err := l.countMatchingOrders(openOrdersKey, activeOrdersKey, statusSet, in.SymbolName)
@@ -59,6 +118,30 @@ func (l *GetOrderListLogic) GetOrderList(in *pb.GetOrderListByUserReq) (*pb.GetO
 		OrderList: orders,
 		Total:     total,
 	}, nil
+}
+
+func orderFinalToOrder(doc *mongodao.OrderFinal) *pb.Order {
+	if doc == nil {
+		return nil
+	}
+	return &pb.Order{
+		Id:                doc.PkID,
+		OrderId:           doc.OrderID,
+		UserId:            doc.UserID,
+		SymbolId:          doc.SymbolID,
+		SymbolName:        doc.SymbolName,
+		BaseAmount:        doc.BaseAmount,
+		Price:             doc.Price,
+		QuoteAmount:       doc.QuoteAmount,
+		Side:              enum.Side(doc.Side),
+		Status:            enum.OrderStatus(doc.Status),
+		OrderType:         enum.OrderType(doc.OrderType),
+		FilledBaseAmount:  doc.FilledBaseAmount,
+		FilledQuoteAmount: doc.FilledQuoteAmount,
+		FilledAvgPrice:    doc.FilledAvgPrice,
+		CreatedAt:         doc.CreatedAt,
+		UpdatedAt:         doc.UpdatedAt,
+	}
 }
 
 func (l *GetOrderListLogic) countMatchingOrders(openOrdersKey, activeOrdersKey string, statusSet map[enum.OrderStatus]struct{}, symbolName string) (int64, error) {

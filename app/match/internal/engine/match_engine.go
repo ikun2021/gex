@@ -1090,6 +1090,18 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 			} else {
 				takerUnFrozenAmount = record.Taker.FilledQuoteAmount
 			}
+			var makerUnFrozenAmount decimal.Decimal
+			if record.Maker.OrderType == enum.OrderType_LO {
+				if matchResult.TakerIsBuy {
+					makerUnFrozenAmount = record.Qty
+				} else {
+					makerUnFrozenAmount = record.Qty.Mul(record.Maker.Price)
+				}
+			} else if matchResult.TakerIsBuy {
+				makerUnFrozenAmount = record.Qty
+			} else {
+				makerUnFrozenAmount = record.Maker.FilledQuoteAmount
+			}
 			makerFilledBaseAmount := record.Maker.BaseAmount.Sub(record.Maker.UnfilledBaseAmount).String()
 			r := &matchMq.MatchResult_MatchedRecord{
 				BaseAmount:  record.Qty.String(),
@@ -1116,6 +1128,7 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 					UnFilledQuoteAmount: record.Maker.UnfilledQuoteAmount.String(),
 					Uid:                 record.Maker.Uid,
 					Id:                  record.Maker.OrderPkId,
+					UnFrozenAmount:      makerUnFrozenAmount.String(),
 				},
 			}
 			records = append(records, r)

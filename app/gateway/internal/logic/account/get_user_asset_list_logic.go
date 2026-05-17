@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 
+	"github.com/ikun2021/gex/app/account/rpc/client/accountservice"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
 
@@ -24,7 +25,29 @@ func NewGetUserAssetListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *GetUserAssetListLogic) GetUserAssetList() (resp *types.GetUserAssetListResp, err error) {
-	// todo: add your logic here and delete this line
+	// TODO: 从 Auth 中间件解析登录用户 uid
+	const uid int64 = 1
 
-	return
+	rpcResp, err := l.svcCtx.AccountRpc.GetUserAssetList(l.ctx, &accountservice.GetUserAssetListReq{
+		Uid: uid,
+	})
+	if err != nil {
+		l.Logger.Errorf("get user asset list failed: %v", err)
+		return nil, err
+	}
+
+	assetList := make([]*types.AssetInfo, 0, len(rpcResp.AssetList))
+	for _, a := range rpcResp.AssetList {
+		assetList = append(assetList, &types.AssetInfo{
+			Id:           a.Id,
+			CoinName:     a.CoinName,
+			CoinID:       a.CoinId,
+			AvailableQty: a.AvailableAmount,
+			FrozenQty:    a.FrozenAmount,
+		})
+	}
+
+	return &types.GetUserAssetListResp{
+		AssetList: assetList,
+	}, nil
 }

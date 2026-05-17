@@ -48,3 +48,8 @@ func ToDBInteger(currency string, amountStr string) (int64, error) {
 	// 只要配置合理 (SHIB=4)，这里基本不会溢出
 	return dbVal.IntPart(), nil
 }
+
+// FromDBInteger 将 Redis 存储的 Int64 转为金额字符串。
+func FromDBInteger(currency string, amount int64) string {
+	return decimal.New(amount, -GetScale(currency)).String()
+}

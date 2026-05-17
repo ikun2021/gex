@@ -1,10 +1,12 @@
 package svc
 
 import (
+	"context"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/account/rpc/internal/config"
+	"github.com/ikun2021/gex/app/account/rpc/internal/dao/mongodao"
 	"github.com/ikun2021/gex/app/account/rpc/internal/dao/query"
 	"github.com/ikun2021/gex/common/defines"
 	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
@@ -13,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/yitter/idgenerator-go/idgen"
 	"github.com/zeromicro/go-zero/core/logx"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ServiceContext struct {
@@ -22,6 +25,10 @@ type ServiceContext struct {
 	JwtClient         *utils.JWT
 	RedisCli          *redis.Client
 	MatchProducers    map[string]pulsar.Producer
+	MongoCli          *mongo.Client
+	OrderFinalRepo    *mongodao.OrderFinalRepo
+	MatchTradeRepo    *mongodao.MatchTradeRepo
+	SettleArchive     *mongodao.SettleArchiveStore
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -70,11 +77,26 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 
 	idgen.SetIdGenerator(idgen.NewIdGeneratorOptions(2))
+
+	mongoCli := c.MongoConf.MustNewClient()
+	orderFinalRepo := mongodao.NewOrderFinalRepo(c.MongoConf.OrderFinalColl(mongoCli))
+	if err := orderFinalRepo.EnsureIndex(context.Background()); err != nil {
+		logx.Errorw("ensure order_final index failed", logx.Field("err", err))
+	}
+	matchTradeRepo := mongodao.NewMatchTradeRepo(c.MongoConf.MatchTradeColl(mongoCli))
+	if err := matchTradeRepo.EnsureIndex(context.Background()); err != nil {
+		logx.Errorw("ensure match_trade index failed", logx.Field("err", err))
+	}
+
 	sc := &ServiceContext{
 		Config:            c,
 		MatchConsumerList: consumers,
 		JwtClient:         utils.NewJWT(),
 		MatchProducers:    m,
+		MongoCli:          mongoCli,
+		OrderFinalRepo:    orderFinalRepo,
+		MatchTradeRepo:    matchTradeRepo,
+		SettleArchive:     mongodao.NewSettleArchiveStore(mongoCli, matchTradeRepo, orderFinalRepo),
 		RedisCli: redis.NewClient(&redis.Options{
 			Addr:     c.RedisConf.Host,
 			Password: c.RedisConf.Pass,

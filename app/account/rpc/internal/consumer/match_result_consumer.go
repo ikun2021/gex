@@ -33,11 +33,15 @@ func InitConsumer(sc *svc.ServiceContext) {
 					}
 					continue
 				}
-
 				h := logic.NewHandleMatchResultLogic(sc)
 				var handleErr error
 				switch msg := m.Result.(type) {
 				case *matchMq.MatchOutput_MatchResult:
+					logx.Infow("receive match result",
+						logx.Field("messageId", m.MessageId),
+						logx.Field("symbol", msg.MatchResult.SymbolName),
+						logx.Field("matchId", msg.MatchResult.MatchId),
+						logx.Field("records", len(msg.MatchResult.MatchedRecord)))
 					handleErr = h.HandleMatchResult(msg, func() error {
 						return c.Ack(message)
 					})
@@ -63,12 +67,13 @@ func InitConsumer(sc *svc.ServiceContext) {
 				}
 
 				if handleErr != nil {
-					logx.Errorw("handle match output failed",
+					logx.Errorw("handle match result failed",
 						logx.Field("messageId", m.MessageId),
 						logger.ErrorField(handleErr))
 					continue
 				}
-				logx.Debugf("match result handled messageId=%d", m.MessageId)
+				logx.Infow("match result settled",
+					logx.Field("messageId", m.MessageId))
 			}
 		}(consumer)
 	}

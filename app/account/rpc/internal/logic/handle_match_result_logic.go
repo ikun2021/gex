@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	"github.com/ikun2021/gex/common/rediskeys"
@@ -103,23 +102,45 @@ type HandleMatchResultLogic struct {
 // HandleMatchResult  结算，扣减用户资产
 func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_MatchResult, storeConsumedMessageId func() error) error {
 	if len(result.MatchResult.MatchedRecord) == 0 {
+		logx.Infow("skip empty match result")
 		return nil
 	}
 
+	match := result.MatchResult
+	logx.Infow("handle match result start",
+		logx.Field("matchId", match.MatchId),
+		logx.Field("symbol", match.SymbolName),
+		logx.Field("recordCount", len(match.MatchedRecord)),
+		logx.Field("takerIsBuy", match.TakerIsBuy))
+
 	// 解析交易对，获取基础币 and 计价币
-	parts := strings.Split(result.MatchResult.SymbolName, "_")
+	parts := strings.Split(match.SymbolName, "_")
 	if len(parts) != 2 {
-		logx.Errorw("invalid symbol format", logx.Field("symbol", result.MatchResult.SymbolName))
-		return fmt.Errorf("invalid symbol format: %s", result.MatchResult.SymbolName)
+		logx.Errorw("invalid symbol format", logx.Field("symbol", match.SymbolName))
+		return fmt.Errorf("invalid symbol format: %s", match.SymbolName)
 	}
 	baseCcy, quoteCcy := parts[0], parts[1]
 
+	ctx := context.Background()
+	matchTrades := collectMatchTradesFromMatch(match)
+	terminalDocs, err := l.collectTerminalOrdersFromMatch(ctx, match)
+	if err != nil {
+		logx.Errorw("collect terminal orders before settle failed",
+			logx.Field("matchId", match.MatchId),
+			logx.Field("error", err.Error()))
+		return err
+	}
+	logx.Infow("prepare settle archive data",
+		logx.Field("matchId", match.MatchId),
+		logx.Field("matchTradeCount", len(matchTrades)),
+		logx.Field("terminalOrderCount", len(terminalDocs)))
+
 	var batchArgs []interface{}
-	batchArgs = append(batchArgs, len(result.MatchResult.MatchedRecord)) // ARGV[1]: count
+	batchArgs = append(batchArgs, len(match.MatchedRecord)) // ARGV[1]: count
 
 	// 收集所有结算记录的参数
-	for _, record := range result.MatchResult.MatchedRecord {
-		args, err := l.getSettleRecordArgs(result.MatchResult, record, baseCcy, quoteCcy, result.MatchResult.SymbolName)
+	for _, record := range match.MatchedRecord {
+		args, err := l.getSettleRecordArgs(match, record, baseCcy, quoteCcy, match.SymbolName)
 		if err != nil {
 			logx.Errorw("get settle record args failed",
 				logx.Field("error", err.Error()),
@@ -130,20 +151,39 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_M
 	}
 
 	// 执行批量原子脚本
-	ctx := context.Background()
-	_, err := atomicSettleBatchScript.Run(ctx, l.svcCtx.RedisCli, []string{}, batchArgs...).Result()
+	logx.Infow("execute redis settle lua",
+		logx.Field("matchId", match.MatchId),
+		logx.Field("settleRecordCount", len(match.MatchedRecord)))
+	_, err = atomicSettleBatchScript.Run(ctx, l.svcCtx.RedisCli, []string{}, batchArgs...).Result()
 	if err != nil {
-		logx.Errorw("execute batch settle script failed", logx.Field("error", err.Error()))
+		logx.Errorw("execute batch settle script failed",
+			logx.Field("matchId", match.MatchId),
+			logx.Field("error", err.Error()))
 		return fmt.Errorf("execute batch settle script failed: %w", err)
+	}
+	logx.Infow("redis settle lua success", logx.Field("matchId", match.MatchId))
+
+	if err := persistSettleArchiveTx(ctx, l.svcCtx, matchTrades, terminalDocs); err != nil {
+		logx.Errorw("persist settle archive failed",
+			logx.Field("matchId", match.MatchId),
+			logx.Field("error", err.Error()))
+		return fmt.Errorf("persist settle archive to mongodb failed: %w", err)
 	}
 
 	// 存储已消费的消息ID（用于幂等性）
 	if err := storeConsumedMessageId(); err != nil {
-		logx.Errorw("store consumed message id failed", logx.Field("error", err.Error()))
+		logx.Errorw("store consumed message id failed",
+			logx.Field("matchId", match.MatchId),
+			logx.Field("error", err.Error()))
 		return err
 	}
 
-	logx.Infow("batch settle success", logx.Field("count", len(result.MatchResult.MatchedRecord)))
+	logx.Infow("handle match result success",
+		logx.Field("matchId", match.MatchId),
+		logx.Field("symbol", match.SymbolName),
+		logx.Field("settleRecordCount", len(match.MatchedRecord)),
+		logx.Field("matchTradeCount", len(matchTrades)),
+		logx.Field("terminalOrderCount", len(terminalDocs)))
 	return nil
 }
 
@@ -162,7 +202,7 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 	if matchResult.TakerIsBuy {
 		takerFrozenField = quoteCcy + "_frozen"
 		takerAvailField = baseCcy
-		takerFrozenDeduct, err = utils.ToDBInteger(quoteCcy, taker.UnFrozenAmount)
+		takerFrozenDeduct, err = l.frozenDeductInt(quoteCcy, taker.UnFrozenAmount, record.QuoteAmount)
 		if err != nil {
 			return nil, fmt.Errorf("convert taker unfrozen amount failed: %w", err)
 		}
@@ -173,7 +213,7 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 
 		makerFrozenField = baseCcy + "_frozen"
 		makerAvailField = quoteCcy
-		makerFrozenDeduct, err = utils.ToDBInteger(baseCcy, maker.UnFrozenAmount)
+		makerFrozenDeduct, err = l.frozenDeductInt(baseCcy, maker.UnFrozenAmount, record.BaseAmount)
 		if err != nil {
 			return nil, fmt.Errorf("convert maker unfrozen amount failed: %w", err)
 		}
@@ -184,7 +224,7 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 	} else {
 		takerFrozenField = baseCcy + "_frozen"
 		takerAvailField = quoteCcy
-		takerFrozenDeduct, err = utils.ToDBInteger(baseCcy, taker.UnFrozenAmount)
+		takerFrozenDeduct, err = l.frozenDeductInt(baseCcy, taker.UnFrozenAmount, record.BaseAmount)
 		if err != nil {
 			return nil, fmt.Errorf("convert taker unfrozen amount failed: %w", err)
 		}
@@ -195,7 +235,7 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 
 		makerFrozenField = quoteCcy + "_frozen"
 		makerAvailField = baseCcy
-		makerFrozenDeduct, err = utils.ToDBInteger(quoteCcy, maker.UnFrozenAmount)
+		makerFrozenDeduct, err = l.frozenDeductInt(quoteCcy, maker.UnFrozenAmount, record.QuoteAmount)
 		if err != nil {
 			return nil, fmt.Errorf("convert maker unfrozen amount failed: %w", err)
 		}
@@ -249,6 +289,12 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	res := cancelResp
 	ctx := context.Background()
 
+	logx.Infow("handle cancel result start",
+		logx.Field("messageId", messageId),
+		logx.Field("orderId", res.OrderId),
+		logx.Field("uid", res.Uid),
+		logx.Field("symbol", symbolName))
+
 	// 1. 获取币种名称
 	coinName := l.getCoinName(res.CoinId)
 	if coinName == "" {
@@ -259,8 +305,27 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	// 2. 准备解冻数量
 	unfreezeAmount, err := utils.ToDBInteger(coinName, res.Amount)
 	if err != nil {
+		logx.Errorw("convert cancel unfreeze amount failed",
+			logx.Field("orderId", res.OrderId),
+			logx.Field("amount", res.Amount),
+			logx.Field("error", err.Error()))
 		return fmt.Errorf("convert amount failed: %w", err)
 	}
+
+	activeInfo, err := l.loadActiveOrderInfo(ctx, res.Uid, res.OrderId)
+	if err != nil {
+		logx.Errorw("load active order before cancel failed",
+			logx.Field("orderId", res.OrderId),
+			logx.Field("uid", res.Uid),
+			logx.Field("error", err.Error()))
+		return fmt.Errorf("load active order before cancel: %w", err)
+	}
+	if activeInfo == nil {
+		logx.Infow("active order snapshot not found before cancel",
+			logx.Field("orderId", res.OrderId),
+			logx.Field("uid", res.Uid))
+	}
+	cancelDoc := buildOrderFinalFromCancel(activeInfo, res, finishReasonCancel)
 
 	// 3. 处理资产解冻及各类索引清理 (原子 Lua 脚本)
 	tag := l.getTag(res.Uid)
@@ -278,14 +343,38 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 		3600 * 24,
 	}
 
+	logx.Infow("execute redis cancel lua",
+		logx.Field("orderId", res.OrderId),
+		logx.Field("uid", res.Uid),
+		logx.Field("coin", coinName),
+		logx.Field("unfreezeAmount", unfreezeAmount))
 	_, err = atomicCancelScript.Run(ctx, l.svcCtx.RedisCli, keys, args...).Result()
 	if err != nil {
+		logx.Errorw("execute cancel lua failed",
+			logx.Field("orderId", res.OrderId),
+			logx.Field("error", err.Error()))
 		return fmt.Errorf("execute atomicCancelScript failed: %w", err)
+	}
+	logx.Infow("redis cancel lua success", logx.Field("orderId", res.OrderId))
+
+	if err := persistOrderFinalTx(ctx, l.svcCtx, cancelDoc); err != nil {
+		logx.Errorw("persist cancel order final failed",
+			logx.Field("orderId", res.OrderId),
+			logx.Field("error", err.Error()))
+		return fmt.Errorf("persist canceled order to mongodb failed: %w", err)
 	}
 
 	if err := storeConsumedMessageId(); err != nil {
+		logx.Errorw("ack cancel message failed",
+			logx.Field("messageId", messageId),
+			logx.Field("orderId", res.OrderId),
+			logx.Field("error", err.Error()))
 		return err
 	}
+	logx.Infow("handle cancel result success",
+		logx.Field("messageId", messageId),
+		logx.Field("orderId", res.OrderId),
+		logx.Field("uid", res.Uid))
 	return nil
 }
 
@@ -297,12 +386,23 @@ func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.Accepte
 
 	ok, err := l.svcCtx.RedisCli.SetNX(ctx, idempotentKey, "1", 24*time.Hour).Result()
 	if err != nil {
+		logx.Errorw("mark accept processed failed",
+			logx.Field("messageId", messageId),
+			logx.Field("orderId", acceptResult.OrderId),
+			logx.Field("error", err.Error()))
 		return fmt.Errorf("mark accept processed failed: %w", err)
 	}
 	if !ok {
+		logx.Infow("accept result already processed",
+			logx.Field("messageId", messageId),
+			logx.Field("orderId", acceptResult.OrderId))
 		return nil
 	}
-	_ = acceptResult
+	logx.Infow("handle accept result success",
+		logx.Field("messageId", messageId),
+		logx.Field("orderId", acceptResult.OrderId),
+		logx.Field("uid", acceptResult.Uid),
+		logx.Field("symbol", acceptResult.SymbolName))
 	return nil
 }
 
@@ -318,4 +418,16 @@ func (l *HandleMatchResultLogic) getCoinName(coinId int32) string {
 
 func (l *HandleMatchResultLogic) getTag(uid int64) string {
 	return rediskeys.UserSlotTag(uid)
+}
+
+// frozenDeductInt 优先使用撮合回传的解冻金额，缺失时回退为本笔成交对应冻结扣减量。
+func (l *HandleMatchResultLogic) frozenDeductInt(currency, fromMatch, fallback string) (int64, error) {
+	amount := fromMatch
+	if amount == "" {
+		amount = fallback
+	}
+	if amount == "" {
+		return 0, fmt.Errorf("unfrozen amount empty for currency %s", currency)
+	}
+	return utils.ToDBInteger(currency, amount)
 }

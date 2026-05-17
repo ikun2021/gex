@@ -27,9 +27,6 @@ import (
 // Redis Stream 的 Key
 const StreamKeyMQOutbox = "mq_outbox"
 
-// 订单详情在 Redis 中的过期时间 (秒)
-const OrderCacheTTL = 600
-
 // Lua脚本详情：
 // 1. 原子性：检查余额、扣减资金、写入发件箱、记录快照在一个事务中完成。
 // 2. 幂等性：使用 idempotencyKey 防止重复下单。
