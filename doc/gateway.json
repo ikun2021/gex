@@ -596,7 +596,10 @@
       }
     },
     "/quotes/v1/get_depth": {
-      "get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -976,7 +979,7 @@
       }
     }
   },
-  "x-date": "2026-05-16 16:20:48",
+  "x-date": "2026-05-20 22:59:59",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

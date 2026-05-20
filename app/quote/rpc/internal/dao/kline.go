@@ -1,4 +1,4 @@
-package model
+package dao
 
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -46,8 +46,8 @@ func (k *MemoryKline) Copy() MemoryKline {
 	}
 }
 
-func (k *MemoryKline) CastToMysqlData(symbolInfo models.Symbol) *Kline {
-	return &Kline{
+func (k *MemoryKline) CastToMysqlData(symbolInfo models.Symbol) *KlineHistory {
+	return &KlineHistory{
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
 		Symbol:    symbolInfo.Name,
@@ -64,7 +64,7 @@ func (k *MemoryKline) CastToMysqlData(symbolInfo models.Symbol) *Kline {
 }
 func (k *MemoryKline) CastToRedisData(symbolInfo models.Symbol, matchID int64) *RedisModel {
 	return &RedisModel{
-		Kline: Kline{
+		KlineHistory: KlineHistory{
 			StartTime: k.StartTime,
 			EndTime:   k.EndTime,
 			Symbol:    symbolInfo.Name,

@@ -28,3 +28,10 @@ Coin:
   - Name: ETH
     Id: 3
     Precision: 8
+
+MongoConf:
+  Uri: mongodb://admin:admin@192.168.2.159:27017/?authSource=admin
+  Database: trade
+  KlineCollection: kline_history
+  TickCollection: tick
+  ConnectTimeoutSeconds: 10

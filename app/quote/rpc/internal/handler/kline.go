@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
+
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/query"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/define"
@@ -19,18 +20,16 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm/clause"
-	"time"
 )
 
 // KlineHandler 基于utc时间
 type KlineHandler struct {
 	//存储k线
-	Klines []*model.MemoryKline
+	Klines []*dao.MemoryKline
 	//落库chan
-	storeLatestKline chan model.StoreKline
+	storeLatestKline chan dao.StoreKline
 	//发送
-	sendChan chan model.MemoryKline
+	sendChan chan dao.MemoryKline
 	//定时写入和发送的定时器
 	ticker *time.Ticker
 	//是否改变
@@ -41,17 +40,17 @@ type KlineHandler struct {
 	svcCtx          *svc.ServiceContext
 	latestMessageID pulsar.MessageID
 	latestMatchId   int64
-	matchData       chan *model.MatchData
+	matchData       chan *dao.MatchData
 	symbolInfo      models.Symbol
 }
 
 func NewKlineHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbolInfo models.Symbol) *KlineHandler {
 	klineHandler := &KlineHandler{
-		storeLatestKline: make(chan model.StoreKline),
-		sendChan:         make(chan model.MemoryKline),
+		storeLatestKline: make(chan dao.StoreKline),
+		sendChan:         make(chan dao.MemoryKline),
 		ticker:           time.NewTicker(300 * time.Millisecond),
 		svcCtx:           svcCtx,
-		matchData:        make(chan *model.MatchData, 10),
+		matchData:        make(chan *dao.MatchData, 10),
 		symbolInfo:       symbolInfo,
 	}
 
@@ -88,7 +87,7 @@ func (kl *KlineHandler) Handle(msg pulsar.Message) {
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
 		logx.Debugw("receive match result data ", logx.Field("data", r))
-		matchData := &model.MatchData{
+		matchData := &dao.MatchData{
 			MessageID:  msg.ID(),
 			MatchID:    cast.ToInt64(r.MatchResult.MatchId),
 			MatchTime:  r.MatchResult.MatchTime / 1e9,
@@ -105,13 +104,13 @@ func (kl *KlineHandler) Handle(msg pulsar.Message) {
 }
 
 func (kl *KlineHandler) readInitData() {
-	klines := make([]*model.MemoryKline, 0, len(model.KlineTypes))
-	for _, v := range model.KlineTypes {
+	klines := make([]*dao.MemoryKline, 0, len(dao.KlineTypes))
+	for _, v := range dao.KlineTypes {
 
 		data, err := kl.svcCtx.RedisClient.Hget(define.Kline.WithParams(), kl.symbolInfo.Name+"_"+v.String())
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
-				kline := &model.MemoryKline{
+				kline := &dao.MemoryKline{
 					StartTime:   0,
 					EndTime:     0,
 					KlineType:   v,
@@ -129,13 +128,13 @@ func (kl *KlineHandler) readInitData() {
 			}
 			logx.Severef("read init kline data failed err=%v", err)
 		}
-		var d model.RedisModel
+		var d dao.RedisModel
 		if err := json.Unmarshal([]byte(data), &d); err != nil {
 			logx.Severef("unmarshal kline data failed err=%v", err)
 		}
 
-		kline := &model.MemoryKline{
-			KlineType:   model.KlineType(d.KlineType),
+		kline := &dao.MemoryKline{
+			KlineType:   dao.KlineType(d.KlineType),
 			StartTime:   d.StartTime,
 			EndTime:     d.EndTime,
 			Amount:      utils.NewFromString(d.Volume),
@@ -175,74 +174,54 @@ func (kl *KlineHandler) update() {
 
 // 存储历史k线和最新的k线
 func (kl *KlineHandler) store() {
-	klineDB := kl.svcCtx.GenDB.Kline
 	for klineData := range kl.storeLatestKline {
 		for {
-			//存储历史k线
+			// 历史 K 线写入 MongoDB
 			if klineData.IsHistory {
-				err := kl.svcCtx.GenDB.Transaction(func(tx *query.Query) error {
-					for _, v := range klineData.Klines {
-						mysqlData := v.CastToMysqlData(kl.symbolInfo)
-						logx.Infow("store history kline data", logx.Field("data", mysqlData))
-						onUpdate := map[string]interface{}{
-							klineDB.Open.ColumnName().String():   mysqlData.Open,
-							klineDB.High.ColumnName().String():   mysqlData.High,
-							klineDB.Low.ColumnName().String():    mysqlData.Low,
-							klineDB.Close.ColumnName().String():  mysqlData.Close,
-							klineDB.Amount.ColumnName().String(): mysqlData.Amount,
-							klineDB.Volume.ColumnName().String(): mysqlData.Volume,
-							klineDB.Range.ColumnName().String():  mysqlData.Range,
-						}
-						if err := klineDB.WithContext(context.Background()).
-							Clauses(clause.OnConflict{
-								DoUpdates: clause.Assignments(onUpdate),
-							}).
-							Create(mysqlData); err != nil {
-							logx.Errorw("store history kline data failed", logx.Field("data", mysqlData), logx.Field("err", err))
-							return err
-						}
-					}
-
-					return nil
-				})
-				if err != nil {
-					logx.Errorf("store message to mysql failed err = %v message id %v", err, klineData.MessageID)
+				if kl.svcCtx.KlineHistoryRepo == nil {
+					logx.Errorw("kline history repo not configured")
 					time.Sleep(time.Second * 3)
+					continue
 				}
-
+				docs := make([]*dao.KlineHistory, 0, len(klineData.Klines))
+				for _, v := range klineData.Klines {
+					docs = append(docs, dao.MemoryKlineToHistory(v, kl.symbolInfo))
+				}
+				if err := kl.svcCtx.KlineHistoryRepo.UpsertMany(context.Background(), docs); err != nil {
+					logx.Errorw("store history kline to mongodb failed",
+						logx.Field("count", len(docs)),
+						logx.Field("err", err))
+					time.Sleep(time.Second * 3)
+					continue
+				}
+				logx.Infow("store history kline to mongodb success", logx.Field("count", len(docs)))
+				break
 			} else {
-				//存储最新的k线
-				if err := kl.svcCtx.GenDB.Transaction(func(tx *query.Query) error {
-					for _, v := range klineData.Klines {
-						data := v.CastToRedisData(kl.symbolInfo, klineData.MatchID)
-						d, _ := json.Marshal(data)
-						if err := kl.svcCtx.RedisClient.Hset(define.Kline.WithParams(), data.Symbol+"_"+v.KlineType.String(), string(d)); err != nil {
-							logx.Errorw("update last kline failed", logger.ErrorField(err))
-							return err
-						}
+				// 最新 K 线写入 Redis
+				for _, v := range klineData.Klines {
+					data := v.CastToRedisData(kl.symbolInfo, klineData.MatchID)
+					d, _ := json.Marshal(data)
+					if err := kl.svcCtx.RedisClient.Hset(define.Kline.WithParams(), data.Symbol+"_"+v.KlineType.String(), string(d)); err != nil {
+						logx.Errorw("update last kline failed", logger.ErrorField(err))
+						time.Sleep(time.Second * 3)
+						continue
 					}
-
-					if klineData.MessageID != nil {
-						if err := kl.consumer.AckIDCumulative(klineData.MessageID); err != nil {
-							logx.Errorw("handler message failed", logger.ErrorField(err), logx.Field("messageID", kl.latestMessageID))
-							return err
-						}
-					}
-
-					return nil
-				}); err != nil {
-					logx.Errorf("store last kline failed err=%v", err)
-					time.Sleep(time.Second * 3)
-
 				}
+				if klineData.MessageID != nil {
+					if err := kl.consumer.AckIDCumulative(klineData.MessageID); err != nil {
+						logx.Errorw("ack kline message failed", logger.ErrorField(err))
+						time.Sleep(time.Second * 3)
+						continue
+					}
+				}
+				break
 			}
 		}
-
 	}
 }
 
 func (kl *KlineHandler) snapshot() {
-	latestKline := make([]*model.MemoryKline, 0, len(kl.Klines))
+	latestKline := make([]*dao.MemoryKline, 0, len(kl.Klines))
 	for _, v := range kl.Klines {
 		t := *v
 		kl.sendChan <- t
@@ -250,7 +229,7 @@ func (kl *KlineHandler) snapshot() {
 
 	}
 	//定时存储最新的一根k线
-	l := model.StoreKline{
+	l := dao.StoreKline{
 		Klines:    latestKline,
 		MessageID: kl.latestMessageID,
 		MatchID:   kl.latestMatchId,
@@ -273,7 +252,7 @@ func (kl *KlineHandler) send() {
 }
 
 // 更新最新的k线
-func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
+func (kl *KlineHandler) updateLatestKline(data *dao.MatchData, isBegin bool) {
 	logx.Debugw("update latest kline  data ", logx.Field("data", data))
 	for _, klineData := range kl.Klines {
 		logx.Debugw("before update ", logx.Field("klineData", klineData.CastToMysqlData(kl.symbolInfo)))
@@ -288,7 +267,7 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 			if klineData.Close.Equal(utils.DecimalZeroMaxPrec) {
 				return
 			}
-			data = &model.MatchData{}
+			data = &dao.MatchData{}
 			data.MatchTime = time.Now().Unix()
 			data.Amount = utils.DecimalZeroMaxPrec
 			data.Volume = utils.DecimalZeroMaxPrec
@@ -304,10 +283,10 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 		)
 		//修正交易时间为一个新的区间,如5分钟k线，交易时间为 06:23 则修改其为 05:00
 		switch klineData.KlineType {
-		case model.Week1:
+		case dao.Week1:
 			startTime = utils.BeginOfWeek(data.MatchTime)
 			endTime = startTime + int64(klineData.KlineType.GetCycle())
-		case model.Month1:
+		case dao.Month1:
 			startTime = utils.BeginOfMonth(data.MatchTime)
 			endTime = utils.NextMonth(startTime)
 		default:
@@ -347,8 +326,8 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 					k.Volume = utils.DecimalZeroMaxPrec
 					k.StartTime = k.StartTime + int64(klineData.KlineType.GetCycle())*i
 					k.EndTime = k.StartTime + int64(klineData.KlineType.GetCycle())
-					sk := model.StoreKline{
-						Klines:    []*model.MemoryKline{&k},
+					sk := dao.StoreKline{
+						Klines:    []*dao.MemoryKline{&k},
 						IsHistory: true,
 					}
 					logx.Sloww("fix missing kline ", logx.Field("data", k.CastToMysqlData(kl.symbolInfo)))
@@ -370,8 +349,8 @@ func (kl *KlineHandler) updateLatestKline(data *model.MatchData, isBegin bool) {
 			}
 			newKline := *klineData
 
-			sk := model.StoreKline{
-				Klines:    []*model.MemoryKline{&historyKline},
+			sk := dao.StoreKline{
+				Klines:    []*dao.MemoryKline{&historyKline},
 				IsHistory: true,
 			}
 			kl.sendChan <- historyKline

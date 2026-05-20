@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/zeromicro/go-zero/core/logx"
 	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/redis/go-redis/v9"
@@ -105,7 +106,7 @@ func processMessage(ctx context.Context, rdb *redis.Client, producer pulsar.Prod
 	})
 
 	if err != nil {
-		fmt.Printf("Pulsar send failed: %v\n", err)
+		logx.Errorf("Pulsar send failed: %v\n", err)
 		return
 	}
 

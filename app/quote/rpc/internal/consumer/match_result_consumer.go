@@ -2,27 +2,21 @@ package consumer
 
 import (
 	"context"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/config"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/handler"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/defines"
 	"github.com/ikun2021/gex/common/models"
-	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
-	"github.com/ikun2021/gex/common/utils"
 	logger "github.com/ikun2021/zlog"
-	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
-	"google.golang.org/protobuf/proto"
 )
 
-//每个业务X交易对 一个消费组
-
+// InitConsumer 每个业务 × 交易对一个消费组，分别处理 tick / ticker / kline / depth。
 func InitConsumer(sc *svc.ServiceContext) {
-
 	for _, v := range sc.Config.Symbol {
-		//tick
+		// tick：成交明细落 MongoDB + Redis 缓存
 		go func(s models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
@@ -30,66 +24,43 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
-				logx.Severef("init handler failed %v", err)
+				logx.Severef("init tick consumer failed %v", err)
+				return
 			}
-			// 1. 定义缓冲区 (在循环外)
-			tickHandle := handler.NewTickHandle(sc, consumer, v)
+			tickHandle := handler.NewTickHandle(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("handler message match result failed", logger.ErrorField(err))
+					logx.Errorw("receive match result failed", logger.ErrorField(err))
 					continue
 				}
 				tickHandle.Handle(message)
-
 			}
 		}(v)
 
+		// ticker：24h 行情统计
 		go func(s models.Symbol) {
-
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
 				SubscriptionName: config.Ticker,
 				Type:             pulsar.Shared,
 			})
 			if err != nil {
-				logx.Severef("init handler failed %v", err)
+				logx.Severef("init ticker consumer failed %v", err)
+				return
 			}
+			tickerHandler := handler.NewTickerHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("handler message match result failed", logger.ErrorField(err))
+					logx.Errorw("receive match result failed", logger.ErrorField(err))
 					continue
 				}
-				var m matchMq.MatchOutput
-				if err := proto.Unmarshal(message.Payload(), &m); err != nil {
-					logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
-					if err := consumer.Ack(message); err != nil {
-						logx.Errorw("handler message failed", logger.ErrorField(err))
-					}
-					continue
-				}
-				switch r := m.Result.(type) {
-				case *matchMq.MatchOutput_MatchResult:
-					logx.Debugw("receive match result data ", logx.Field("data", r))
-					matchData := &model.MatchData{
-						MessageID:  message.ID(),
-						MatchID:    cast.ToInt64(r.MatchResult.MatchId),
-						MatchTime:  r.MatchResult.MatchTime / 1e9,
-						Volume:     utils.NewFromString(r.MatchResult.Amount).Mul(utils.NewFromString("2")),
-						Amount:     utils.NewFromString(r.MatchResult.Qty).Mul(utils.NewFromString("2")),
-						StartPrice: utils.NewFromString(r.MatchResult.BeginPrice),
-						EndPrice:   utils.NewFromString(r.MatchResult.EndPrice),
-						Low:        utils.NewFromString(r.MatchResult.LowPrice),
-						High:       utils.NewFromString(r.MatchResult.HighPrice),
-					}
-					md <- matchData
-				}
-
+				tickerHandler.Handle(message)
 			}
 		}(v)
 
-		//kline
+		// kline：历史 K 线落 MongoDB，最新 K 线落 Redis
 		go func(s models.Symbol) {
 			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
 				Topic:            defines.MatchTopicOutputPrefix + s.Name,
@@ -97,41 +68,19 @@ func InitConsumer(sc *svc.ServiceContext) {
 				Type:             pulsar.Exclusive,
 			})
 			if err != nil {
-				logx.Severef("init handler failed %v", err)
+				logx.Severef("init kline consumer failed %v", err)
+				return
 			}
 			klineHandler := handler.NewKlineHandler(sc, consumer, s)
 			for {
 				message, err := consumer.Receive(context.Background())
 				if err != nil {
-					logx.Errorw("handler message match result failed", logger.ErrorField(err))
+					logx.Errorw("receive match result failed", logger.ErrorField(err))
 					continue
 				}
-
 				klineHandler.Handle(message)
 			}
-
 		}(v)
 
-		//depth
-		go func(s models.Symbol) {
-			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:            defines.MatchTopicOutputPrefix + s.Name,
-				SubscriptionName: config.Depth,
-				Type:             pulsar.Shared,
-			})
-			if err != nil {
-				logx.Severef("init handler failed %v", err)
-			}
-			depthHandler := handler.NewDepthHandler(sc, consumer, s)
-			for {
-				message, err := consumer.Receive(context.Background())
-				if err != nil {
-					logx.Errorw("handler message match result failed", logger.ErrorField(err))
-					continue
-				}
-				depthHandler.Handle(message)
-			}
-		}(v)
 	}
-
 }

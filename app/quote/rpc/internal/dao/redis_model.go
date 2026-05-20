@@ -1,6 +1,6 @@
-package model
+package dao
 
 type RedisModel struct {
-	Kline
+	KlineHistory
 	MatchID int64 `json:"match_id"`
 }

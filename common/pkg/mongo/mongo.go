@@ -14,6 +14,8 @@ type Conf struct {
 	Database               string `json:"database"`
 	OrderFinalCollection   string `json:"orderFinalCollection,optional"`
 	MatchTradeCollection   string `json:"matchTradeCollection,optional"`
+	KlineCollection        string `json:"klineCollection,optional"`
+	TickCollection         string `json:"tickCollection,optional"`
 	ConnectTimeoutSeconds  int    `json:"connectTimeoutSeconds,optional"`
 }
 
@@ -58,4 +60,26 @@ func (c *Conf) matchTradeCollection() string {
 		return "match_trade"
 	}
 	return c.MatchTradeCollection
+}
+
+func (c *Conf) KlineColl(client *mongo.Client) *mongo.Collection {
+	return client.Database(c.Database).Collection(c.klineCollection())
+}
+
+func (c *Conf) klineCollection() string {
+	if c.KlineCollection == "" {
+		return "kline_history"
+	}
+	return c.KlineCollection
+}
+
+func (c *Conf) TickColl(client *mongo.Client) *mongo.Collection {
+	return client.Database(c.Database).Collection(c.tickCollection())
+}
+
+func (c *Conf) tickCollection() string {
+	if c.TickCollection == "" {
+		return "tick"
+	}
+	return c.TickCollection
 }

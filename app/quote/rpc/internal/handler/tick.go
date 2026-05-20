@@ -2,24 +2,23 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"time"
+
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/models"
+	"github.com/ikun2021/gex/common/proto/define"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
 	commonWs "github.com/ikun2021/gex/common/proto/ws"
 	logger "github.com/ikun2021/zlog"
 	gpush "github.com/luxun9527/gpush/proto"
-	"github.com/spf13/cast"
 	"github.com/zeromicro/go-zero/core/logx"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
-	"time"
 )
 
-const (
-	tradeTableName = "trade_"
-)
+const tickRedisMaxLen = 500
 
 type TickHandle struct {
 	consumer     pulsar.Consumer
@@ -47,6 +46,7 @@ func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol 
 	go t.send()
 	return t
 }
+
 func (t *TickHandle) Handle(message pulsar.Message) {
 	var m matchMq.MatchOutput
 	if err := proto.Unmarshal(message.Payload(), &m); err != nil {
@@ -61,29 +61,27 @@ func (t *TickHandle) Handle(message pulsar.Message) {
 
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
-
 		t.sendChan <- r.MatchResult
 		t.currentMsgId = message.ID()
 	}
-
 }
 
 func (t *TickHandle) commitBatch() {
 	if len(t.batchData) == 0 {
 		return
 	}
-	// --- 数据库写入 (失败重试) ---
 	for {
 		if err := t.storeMatchResult(t.svcCtx, t.batchData); err != nil {
-			logx.Errorw("store match result failed, retrying...", logger.ErrorField(err))
-			time.Sleep(3 * time.Second) // 失败退避
+			logx.Errorw("store tick failed, retrying...", logger.ErrorField(err))
+			time.Sleep(3 * time.Second)
 			continue
 		}
 		break
 	}
-
-	logx.Info("batch commit success")
+	t.batchData = t.batchData[:0]
+	logx.Info("tick batch commit success")
 }
+
 func (kl *TickHandle) send() {
 	for data := range kl.sendChan {
 		for _, v := range data.MatchedRecord {
@@ -102,23 +100,19 @@ func (kl *TickHandle) send() {
 				Topic: commonWs.TickPrefix.WithParam(kl.symbolInfo.Name),
 				Data:  msg.ToBytes(),
 			}); err != nil {
-				logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
+				logx.Errorw("push tick websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
 			}
 		}
-
 	}
 }
+
 func (t TickHandle) start() {
-	// 5. 主循环 (现在是真正的非阻塞 Select)
 	for {
 		select {
-		// 情况 A: 时间到了 -> 强制提交
 		case <-t.ticker.C:
 			if len(t.batchData) > 0 {
 				t.commitBatch()
 			}
-
-		// 情况 B: 收到新消息 -> 放入缓冲区
 		case matchResult := <-t.msgChan:
 			switch r := matchResult.Result.(type) {
 			case *matchMq.MatchOutput_MatchResult:
@@ -126,131 +120,96 @@ func (t TickHandle) start() {
 			default:
 				continue
 			}
-
-			// 数量够了 -> 提交
 			if len(t.batchData) >= 100 {
 				t.commitBatch()
-				// 重置定时器，防止刚提交完马上又触发定时任务，浪费资源
 				t.ticker.Reset(2 * time.Second)
 			}
 			t.latestMsgId = matchResult.MessageId
 		}
 	}
 }
-func (t TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*matchMq.MatchResult) error {
 
-	var (
-		insertGroup = map[string][]*model.Trade{}
-	)
+func (t TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*matchMq.MatchResult) error {
+	if svcCtx.TickRepo == nil {
+		return nil
+	}
+
+	docs := make([]*dao.TickDoc, 0, len(insertData)*2)
+	redisKey := define.Tick.WithParams(t.symbolInfo.Name)
+	ctx := context.Background()
 
 	for _, v := range insertData {
+		matchTime := v.MatchTime
+		if matchTime > 1e12 {
+			matchTime = matchTime / 1e9
+		}
 		for _, v1 := range v.MatchedRecord {
-			//maker
-			suffix := cast.ToString(v1.Maker.Uid % 10)
-			trades, ok := insertGroup[tradeTableName+suffix]
-			var (
-				size = int32(1)
+			makerSide := int32(2)
+			if v.TakerIsBuy {
+				makerSide = 2
+			} else {
+				makerSide = 1
+			}
+			takerSide := int32(1)
+			if v.TakerIsBuy {
+				takerSide = 1
+			} else {
+				takerSide = 2
+			}
+
+			docs = append(docs,
+				&dao.TickDoc{
+					PkID:        v1.Maker.Id,
+					MatchID:     v.MatchId,
+					MatchSubID:  v1.MatchSubId,
+					OrderID:     v1.Maker.OrderId,
+					UserID:      v1.Maker.Uid,
+					Symbol:      v.SymbolName,
+					Price:       v1.Price,
+					BaseAmount:  v1.BaseAmount,
+					QuoteAmount: v1.QuoteAmount,
+					Side:        makerSide,
+					Role:        1,
+					CreatedAt:   matchTime,
+				},
+				&dao.TickDoc{
+					PkID:        v1.Taker.Id,
+					MatchID:     v.MatchId,
+					MatchSubID:  v1.MatchSubId,
+					OrderID:     v1.Taker.OrderId,
+					UserID:      v1.Taker.Uid,
+					Symbol:      v.SymbolName,
+					Price:       v1.Price,
+					BaseAmount:  v1.BaseAmount,
+					QuoteAmount: v1.QuoteAmount,
+					Side:        takerSide,
+					Role:        2,
+					CreatedAt:   matchTime,
+				},
 			)
-			if v.TakerIsBuy {
-				size = 2
-			}
-			if ok {
-				//maker
-				trades = append(trades, &model.Trade{
-					ID:          v1.Maker.Id,
-					MatchID:     v.MatchId,
-					OrderID:     v1.Maker.OrderId,
-					MatchSubID:  v1.MatchSubId,
-					UserID:      v1.Maker.Uid,
-					Symbol:      v.SymbolName,
-					Price:       v1.Price,
-					BaseAcmount: v1.BaseAmount,
-					QuoteAmount: v1.QuoteAmount,
-					Side:        size,
-					Role:        1,
-					Fee:         "",
-					FeeCurrency: "",
-					CreatedAt:   v.MatchTime,
-				})
 
-			} else {
-				insertGroup[tradeTableName+suffix] = []*model.Trade{{
-					ID:          v1.Maker.Id,
-					MatchID:     v.MatchId,
-					OrderID:     v1.Maker.OrderId,
-					UserID:      v1.Maker.Uid,
-					Symbol:      v.SymbolName,
-					Price:       v1.Price,
-					BaseAcmount: v1.BaseAmount,
-					QuoteAmount: v1.QuoteAmount,
-					Side:        size,
-					Role:        1,
-					Fee:         "",
-					FeeCurrency: "",
-					CreatedAt:   v.MatchTime,
-				}}
+			tickPayload := commonWs.Tick{
+				Price:        v1.Price,
+				BaseAmount:   v1.BaseAmount,
+				QuoteAmount:  v1.QuoteAmount,
+				TimeStamp:    matchTime,
+				TakerIsBuyer: v.TakerIsBuy,
 			}
-			//taker
-			size = int32(2)
-
-			if v.TakerIsBuy {
-				size = 1
+			if b, err := json.Marshal(tickPayload); err == nil {
+				if _, err := svcCtx.RedisClient.Lpush(redisKey, string(b)); err != nil {
+					logx.Errorw("cache tick to redis failed", logger.ErrorField(err))
+				} else if err := svcCtx.RedisClient.Ltrim(redisKey, 0, tickRedisMaxLen-1); err != nil {
+					logx.Errorw("trim tick redis list failed", logger.ErrorField(err))
+				}
 			}
-			suffix = cast.ToString(v1.Taker.Uid % 10)
-			trades, ok = insertGroup[tradeTableName+suffix]
-			if ok {
-				trades = append(trades, &model.Trade{
-					ID:          v1.Taker.Id,
-					MatchID:     v.MatchId,
-					OrderID:     v1.Taker.OrderId,
-					MatchSubID:  v1.MatchSubId,
-					UserID:      v1.Taker.Uid,
-					Symbol:      v.SymbolName,
-					Price:       v1.Price,
-					BaseAcmount: v1.BaseAmount,
-					QuoteAmount: v1.QuoteAmount,
-					Side:        size,
-					Role:        1,
-					Fee:         "",
-					FeeCurrency: "",
-					CreatedAt:   v.MatchTime,
-				})
-
-			} else {
-				insertGroup[tradeTableName+suffix] = []*model.Trade{{
-					ID:          v1.Taker.Id,
-					MatchID:     v.MatchId,
-					OrderID:     v1.Taker.OrderId,
-					MatchSubID:  v1.MatchSubId,
-					UserID:      v1.Taker.Uid,
-					Symbol:      v.SymbolName,
-					Price:       v1.Price,
-					BaseAcmount: v1.BaseAmount,
-					QuoteAmount: v1.QuoteAmount,
-					Side:        size,
-					Role:        1,
-					Fee:         "",
-					FeeCurrency: "",
-					CreatedAt:   v.MatchTime,
-				}}
-			}
-
 		}
-
 	}
-	if err := svcCtx.DB.Transaction(func(tx *gorm.DB) error {
-		for tableName, data := range insertGroup {
-			if err := tx.Table(tableName).CreateInBatches(data, len(data)).Error; err != nil {
-				logx.Errorf("insert data failed %v", err)
-				return err
-			}
-		}
-		if err := t.consumer.AckIDCumulative(t.currentMsgId); err != nil {
-			logx.Errorf("ack message failed %v", err)
-			return err
-		}
-		return nil
-	}); err != nil {
+
+	if err := svcCtx.TickRepo.InsertMany(ctx, docs); err != nil {
+		return err
+	}
+
+	if err := t.consumer.AckIDCumulative(t.currentMsgId); err != nil {
 		return err
 	}
 	return nil

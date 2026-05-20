@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/dao/quote/model"
+	"github.com/ikun2021/gex/app/quote/rpc/internal/dao"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
 	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/proto/define"
@@ -24,10 +24,10 @@ type TickerHandler struct {
 	consumer      pulsar.Consumer
 	svcCtx        *svc.ServiceContext
 	symbolInfo    models.Symbol
-	kline1mBuffer []*model.MemoryKline
+	kline1mBuffer []*dao.MemoryKline
 	latestPrice   decimal.Decimal
 	latestMatchId int64
-	matchData     chan *model.MatchData
+	matchData     chan *dao.MatchData
 }
 
 func NewTickerHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol models.Symbol) *TickerHandler {
@@ -35,9 +35,9 @@ func NewTickerHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symb
 		consumer:      consumer,
 		svcCtx:        svcCtx,
 		symbolInfo:    symbol,
-		kline1mBuffer: make([]*model.MemoryKline, 0, 1440),
+		kline1mBuffer: make([]*dao.MemoryKline, 0, 1440),
 		latestPrice:   utils.DecimalZeroMaxPrec,
-		matchData:     make(chan *model.MatchData, 100),
+		matchData:     make(chan *dao.MatchData, 100),
 	}
 	th.init()
 	go th.start()
@@ -45,42 +45,32 @@ func NewTickerHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symb
 }
 
 func (th *TickerHandler) init() {
-	// 加载过去24小时的1分钟K线
-	kline := th.svcCtx.GenDB.Kline
+	// 从 MongoDB 加载过去 24 小时的 1 分钟 K 线
 	startTime := time.Now().Add(-24 * time.Hour).Unix()
-	klines, err := th.svcCtx.GenDB.Kline.WithContext(context.Background()).
-		Where(kline.Symbol.Eq(th.symbolInfo.Name),
-			kline.KlineType.Eq(int32(model.Min1)),
-			kline.StartTime.Lt(startTime)).
-		Order(kline.StartTime.Desc()).
-		Find()
-	if err != nil {
-		logx.Errorf("load 24h klines failed err=%v", err)
-	}
-
-	for _, k := range klines {
-		mk := &model.MemoryKline{
-			KlineType: model.Min1,
-			StartTime: k.StartTime,
-			EndTime:   k.EndTime,
-			Amount:    utils.NewFromString(k.Amount),
-			Volume:    utils.NewFromString(k.Volume),
-			Open:      utils.NewFromString(k.Open),
-			High:      utils.NewFromString(k.High),
-			Low:       utils.NewFromString(k.Low),
-			Close:     utils.NewFromString(k.Close),
+	if th.svcCtx.KlineHistoryRepo != nil {
+		klines, err := th.svcCtx.KlineHistoryRepo.ListSince(
+			context.Background(), th.symbolInfo.Name, int32(dao.Min1), startTime)
+		if err != nil {
+			logx.Errorf("load 24h klines from mongodb failed err=%v", err)
+		} else {
+			for _, k := range klines {
+				mk := dao.HistoryToMemoryKline(k)
+				if mk == nil {
+					continue
+				}
+				th.kline1mBuffer = append(th.kline1mBuffer, mk)
+				th.latestPrice = mk.Close
+			}
 		}
-		th.kline1mBuffer = append(th.kline1mBuffer, mk)
-		th.latestPrice = mk.Close
 	}
 
 	// 从Redis读取当前1分钟K线
-	data, err := th.svcCtx.RedisClient.Hget(define.Kline.WithParams(), th.symbolInfo.Name+"_"+model.Min1.String())
+	data, err := th.svcCtx.RedisClient.Hget(define.Kline.WithParams(), th.symbolInfo.Name+"_"+dao.Min1.String())
 	if err == nil && data != "" {
-		var d model.RedisModel
+		var d dao.RedisModel
 		if err := json.Unmarshal([]byte(data), &d); err == nil {
-			mk := &model.MemoryKline{
-				KlineType: model.Min1,
+			mk := &dao.MemoryKline{
+				KlineType: dao.Min1,
 				StartTime: d.StartTime,
 				EndTime:   d.EndTime,
 				Amount:    utils.NewFromString(d.Amount),
@@ -115,7 +105,7 @@ func (th *TickerHandler) Handle(msg pulsar.Message) {
 
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
-		md := &model.MatchData{
+		md := &dao.MatchData{
 			MatchID:    m.MessageId,
 			MatchTime:  r.MatchResult.MatchTime / 1e9,
 			Volume:     utils.NewFromString(r.MatchResult.QuoteAmount),
@@ -144,7 +134,7 @@ func (th *TickerHandler) start() {
 	}
 }
 
-func (th *TickerHandler) update(md *model.MatchData) {
+func (th *TickerHandler) update(md *dao.MatchData) {
 	startTime := md.MatchTime / 60 * 60
 	endTime := startTime + 60
 
@@ -167,8 +157,8 @@ func (th *TickerHandler) update(md *model.MatchData) {
 	}
 
 	// 开启新的一分钟
-	mk := &model.MemoryKline{
-		KlineType: model.Min1,
+	mk := &dao.MemoryKline{
+		KlineType: dao.Min1,
 		StartTime: startTime,
 		EndTime:   endTime,
 		Open:      md.StartPrice,

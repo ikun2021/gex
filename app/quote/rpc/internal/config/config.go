@@ -4,6 +4,7 @@ import (
 	"github.com/ikun2021/gex/common/models"
 	"github.com/ikun2021/gex/common/pkg/etcd"
 	commongorm "github.com/ikun2021/gex/common/pkg/gorm"
+	commonmongo "github.com/ikun2021/gex/common/pkg/mongo"
 	"github.com/ikun2021/gex/common/pkg/pulsar"
 	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -13,6 +14,7 @@ import (
 type Config struct {
 	zrpc.RpcServerConf
 	GormConf         commongorm.GormConf
+	MongoConf        commonmongo.Conf
 	RedisConf        redis.RedisConf
 	WsConf           zrpc.RpcClientConf
 	PulsarConfig     pulsar.PulsarConfig

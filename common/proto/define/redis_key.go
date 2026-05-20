@@ -4,6 +4,7 @@ type RedisKey string
 
 const (
 	Ticker                   RedisKey = "gex:ticker"
+	Tick                     RedisKey = "gex:tick"
 	Kline                    RedisKey = "gex:kline"
 	AccountToken             RedisKey = "gex:account:token"
 	AccountConsumedMessageId RedisKey = "gex:account:consumed:messageId"
