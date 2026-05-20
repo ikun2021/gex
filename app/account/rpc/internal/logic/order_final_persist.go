@@ -83,7 +83,6 @@ func buildMatchTradeSide(resp *matchMq.OrderResp) mongodao.MatchTradeSide {
 		FilledQuoteAmount:   resp.FilledQuoteAmount,
 		UnFilledQuoteAmount: resp.UnFilledQuoteAmount,
 		OrderStatus:         int32(resp.OrderStatus),
-		UnFrozenAmount:      resp.UnFrozenAmount,
 	}
 }
 

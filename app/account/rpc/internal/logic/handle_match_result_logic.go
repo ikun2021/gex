@@ -420,11 +420,11 @@ func (l *HandleMatchResultLogic) getTag(uid int64) string {
 	return rediskeys.UserSlotTag(uid)
 }
 
-// frozenDeductInt 优先使用撮合回传的解冻金额，缺失时回退为本笔成交对应冻结扣减量。
+// frozenDeductInt 以本笔成交冻结扣减量为准；撮合回传仅作兜底。
 func (l *HandleMatchResultLogic) frozenDeductInt(currency, fromMatch, fallback string) (int64, error) {
-	amount := fromMatch
+	amount := fallback
 	if amount == "" {
-		amount = fallback
+		amount = fromMatch
 	}
 	if amount == "" {
 		return 0, fmt.Errorf("unfrozen amount empty for currency %s", currency)

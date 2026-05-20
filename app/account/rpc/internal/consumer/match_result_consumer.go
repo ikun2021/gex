@@ -33,6 +33,7 @@ func InitConsumer(sc *svc.ServiceContext) {
 					}
 					continue
 				}
+				logx.Debugf("match result %+v", &m)
 				h := logic.NewHandleMatchResultLogic(sc)
 				var handleErr error
 				switch msg := m.Result.(type) {

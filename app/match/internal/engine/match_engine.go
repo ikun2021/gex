@@ -1074,22 +1074,28 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 			lowPrice = endPrice
 		}
 		records := make([]*matchMq.MatchResult_MatchedRecord, 0, len(matchResult.MatchedRecords))
-		totalQty, totalAmount, takerUnFrozenAmount := utils.DecimalZeroMaxPrec, utils.DecimalZeroMaxPrec, utils.DecimalZeroMaxPrec
+		totalQty, totalAmount := utils.DecimalZeroMaxPrec, utils.DecimalZeroMaxPrec
 		for _, record := range matchResult.MatchedRecords {
 			//本次撮合一共撮合了多少
 			totalQty = totalQty.Add(record.Qty)
 			totalAmount = totalAmount.Add(record.Amount)
 			takerFilledQty := record.Taker.FilledBaseAmount.String()
 
+			// 本笔成交对应的解冻量（按冻结币种：买单解冻计价币，卖单解冻基础币）
+			var takerUnFrozenAmount decimal.Decimal
 			if record.Taker.OrderType == enum.OrderType_LO {
-				//taker解冻的金额，以taker的成交价格为准
-				a := record.Qty.Mul(record.Taker.Price)
-				takerUnFrozenAmount = takerUnFrozenAmount.Add(a)
+				if matchResult.TakerIsBuy {
+					takerUnFrozenAmount = record.Qty.Mul(record.Taker.Price)
+				} else {
+					takerUnFrozenAmount = record.Qty
+				}
 				takerFilledQty = record.Taker.BaseAmount.Sub(record.Taker.UnfilledBaseAmount).String()
-
+			} else if matchResult.TakerIsBuy {
+				takerUnFrozenAmount = record.Amount
 			} else {
-				takerUnFrozenAmount = record.Taker.FilledQuoteAmount
+				takerUnFrozenAmount = record.Qty
 			}
+
 			var makerUnFrozenAmount decimal.Decimal
 			if record.Maker.OrderType == enum.OrderType_LO {
 				if matchResult.TakerIsBuy {
@@ -1100,7 +1106,7 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 			} else if matchResult.TakerIsBuy {
 				makerUnFrozenAmount = record.Qty
 			} else {
-				makerUnFrozenAmount = record.Maker.FilledQuoteAmount
+				makerUnFrozenAmount = record.Amount
 			}
 			makerFilledBaseAmount := record.Maker.BaseAmount.Sub(record.Maker.UnfilledBaseAmount).String()
 			r := &matchMq.MatchResult_MatchedRecord{
