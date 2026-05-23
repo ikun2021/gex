@@ -98,6 +98,7 @@ func (th *TickerHandler) Handle(msg pulsar.Message) {
 		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
 		return
 	}
+	logx.Debugf("ticker consumer receive message: %v", &m)
 
 	if th.latestMatchId >= m.MessageId {
 		return

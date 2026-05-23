@@ -34,8 +34,6 @@ type (
 		GetTicker(ctx context.Context, in *GetTickerReq, opts ...grpc.CallOption) (*GetTickerResp, error)
 		// 获取tick
 		GetTick(ctx context.Context, in *GetTickReq, opts ...grpc.CallOption) (*GetTickResp, error)
-		// 获取深度
-		GetDepth(ctx context.Context, in *GetDepthReq, opts ...grpc.CallOption) (*GetDepthResp, error)
 	}
 
 	defaultQuoteService struct {
@@ -65,10 +63,4 @@ func (m *defaultQuoteService) GetTicker(ctx context.Context, in *GetTickerReq, o
 func (m *defaultQuoteService) GetTick(ctx context.Context, in *GetTickReq, opts ...grpc.CallOption) (*GetTickResp, error) {
 	client := pb.NewQuoteServiceClient(m.cli.Conn())
 	return client.GetTick(ctx, in, opts...)
-}
-
-// 获取深度
-func (m *defaultQuoteService) GetDepth(ctx context.Context, in *GetDepthReq, opts ...grpc.CallOption) (*GetDepthResp, error) {
-	client := pb.NewQuoteServiceClient(m.cli.Conn())
-	return client.GetDepth(ctx, in, opts...)
 }

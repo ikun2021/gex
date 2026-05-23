@@ -96,28 +96,7 @@ message GetTickReq{
   //多少条
   int32 limit=2;
 }
-message GetDepthReq{
-  //交易对
-  string symbol=1;
-  //档位
-  int32  level =2;
-}
-message GetDepthResp{
-  //订单簿版本
-  int64 version=1;
-  message Position{
-    //数量
-    string baseAmount=1;
-    //价格
-    string price=2;
-    //金额
-    string quoteAmount=3;
-  }
-  //卖盘
-  repeated  Position asks=2;
-  //买盘
-  repeated  Position bids=3;
-}
+
 message Tick{
   string price = 1; //价格
   string baseAmount = 2; //计价币数量
@@ -141,6 +120,4 @@ service QuoteService {
   rpc GetTicker(GetTickerReq)returns(GetTickerResp);
   //获取tick
   rpc GetTick(GetTickReq)returns(GetTickResp);
-  //获取深度
-  rpc GetDepth(GetDepthReq)returns(GetDepthResp);
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ikun2021/gex/app/account/rpc/internal/config"
 	"github.com/ikun2021/gex/app/account/rpc/internal/dao/mongodao"
-	"github.com/ikun2021/gex/app/account/rpc/internal/dao/query"
 	"github.com/ikun2021/gex/common/defines"
 	pulsarConfig "github.com/ikun2021/gex/common/pkg/pulsar"
 	"github.com/ikun2021/gex/common/utils"
@@ -20,7 +19,6 @@ import (
 
 type ServiceContext struct {
 	Config            config.Config
-	Query             *query.Query
 	MatchConsumerList []pulsar.Consumer
 	JwtClient         *utils.JWT
 	RedisCli          *redis.Client

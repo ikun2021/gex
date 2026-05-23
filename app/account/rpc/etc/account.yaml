@@ -39,14 +39,6 @@ Coin:
     Precision: 4
 
 
-GormConf:
-  ip: 192.168.2.159
-  port: 3307
-  dbName: trade
-  username: root
-  password: root
-  maxIdleConns: 10
-  maxOpenConns: 100
 LoggerConfig:
   level: debug  #日志等级 debug info warn error
   stacktrace: true #默认为true 在error级别及以上显示堆栈

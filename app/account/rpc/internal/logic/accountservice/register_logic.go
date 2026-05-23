@@ -2,12 +2,6 @@ package accountservicelogic
 
 import (
 	"context"
-	"errors"
-	"github.com/ikun2021/gex/app/account/rpc/internal/dao/model"
-	"github.com/ikun2021/gex/common/errs"
-	"github.com/ikun2021/gex/common/utils"
-	logger "github.com/ikun2021/zlog"
-	"gorm.io/gorm"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
@@ -31,21 +25,5 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 // 注册
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
-	user := &model.User{
-		Username:    in.Username,
-		Password:    utils.BcryptHash(in.Password),
-		PhoneNumber: in.PhoneNumber,
-		Status:      1,
-	}
-	if err := l.svcCtx.Query.User.WithContext(l.ctx).Create(user); err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return nil, errs.DuplicateDataErr
-		}
-		logx.Errorw("create user failed", logger.ErrorField(err))
-		return nil, errs.ExecSqlFailed
-	}
-	return &pb.RegisterResp{
-		Username: in.Username,
-		Uid:      int64(user.ID),
-	}, nil
+	return nil, nil
 }

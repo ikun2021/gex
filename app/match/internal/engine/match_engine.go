@@ -1001,8 +1001,8 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 			MsgId:   m.currentMsgId,
 		})
 	} else {
-		logx.Debugf("处理之前")
-		m.dump()
+		//logx.Debugf("处理之前")
+		//m.dump()
 		switch {
 		//买单市价单
 		case inputMsg.Side == enum.Side_Buy && inputMsg.OrderType == enum.OrderType_MO:
@@ -1055,7 +1055,7 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 			}
 		}
 		logx.Debugf("处理之后")
-		m.dump()
+		//m.dump()
 	}
 
 }

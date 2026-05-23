@@ -6,6 +6,7 @@ import (
 	"github.com/ikun2021/gex/app/gateway/internal/config"
 	"github.com/ikun2021/gex/app/gateway/internal/handler"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
+	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -25,7 +26,8 @@ func main() {
 
 	ctx := svc.NewServiceContext(c)
 	handler.RegisterHandlers(server, ctx)
-
+	logx.SetLevel(logx.DebugLevel)
+	logx.SetWriter(logger.NewZapWriter(logger.GetZapLogger()))
 	logx.Infof("Starting server at %s:%d...\n", c.Host, c.Port)
 	server.Start()
 }

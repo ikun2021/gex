@@ -3,84 +3,65 @@ package consumer
 import (
 	"context"
 
-	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/ikun2021/gex/app/quote/rpc/internal/config"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/handler"
 	"github.com/ikun2021/gex/app/quote/rpc/internal/svc"
-	"github.com/ikun2021/gex/common/defines"
 	"github.com/ikun2021/gex/common/models"
 	logger "github.com/ikun2021/zlog"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// InitConsumer 每个业务 × 交易对一个消费组，分别处理 tick / ticker / kline / depth。
+// InitConsumer 启动各交易对 tick / ticker / kline 消费循环（消费者已在 ServiceContext 中创建）。
 func InitConsumer(sc *svc.ServiceContext) {
-	for _, v := range sc.Config.Symbol {
-		// tick：成交明细落 MongoDB + Redis 缓存
-		go func(s models.Symbol) {
-			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:            defines.MatchTopicOutputPrefix + s.Name,
-				SubscriptionName: config.Tick,
-				Type:             pulsar.Exclusive,
-			})
-			if err != nil {
-				logx.Severef("init tick consumer failed %v", err)
-				return
-			}
-			tickHandle := handler.NewTickHandle(sc, consumer, s)
-			for {
-				message, err := consumer.Receive(context.Background())
-				if err != nil {
-					logx.Errorw("receive match result failed", logger.ErrorField(err))
-					continue
-				}
-				tickHandle.Handle(message)
-			}
-		}(v)
-
-		// ticker：24h 行情统计
-		go func(s models.Symbol) {
-			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:            defines.MatchTopicOutputPrefix + s.Name,
-				SubscriptionName: config.Ticker,
-				Type:             pulsar.Shared,
-			})
-			if err != nil {
-				logx.Severef("init ticker consumer failed %v", err)
-				return
-			}
-			tickerHandler := handler.NewTickerHandler(sc, consumer, s)
-			for {
-				message, err := consumer.Receive(context.Background())
-				if err != nil {
-					logx.Errorw("receive match result failed", logger.ErrorField(err))
-					continue
-				}
-				tickerHandler.Handle(message)
-			}
-		}(v)
-
-		// kline：历史 K 线落 MongoDB，最新 K 线落 Redis
-		go func(s models.Symbol) {
-			consumer, err := sc.PulsarClient.Subscribe(pulsar.ConsumerOptions{
-				Topic:            defines.MatchTopicOutputPrefix + s.Name,
-				SubscriptionName: config.Kline,
-				Type:             pulsar.Exclusive,
-			})
-			if err != nil {
-				logx.Severef("init kline consumer failed %v", err)
-				return
-			}
-			klineHandler := handler.NewKlineHandler(sc, consumer, s)
-			for {
-				message, err := consumer.Receive(context.Background())
-				if err != nil {
-					logx.Errorw("receive match result failed", logger.ErrorField(err))
-					continue
-				}
-				klineHandler.Handle(message)
-			}
-		}(v)
-
+	for _, sym := range sc.Config.Symbol {
+		consumers, ok := sc.MatchConsumers[sym.Name]
+		if !ok || consumers == nil {
+			logx.Errorw("match consumers not found for symbol", logx.Field("symbol", sym.Name))
+			continue
+		}
+		startTickConsumer(sc, sym, consumers)
+		startTickerConsumer(sc, sym, consumers)
+		startKlineConsumer(sc, sym, consumers)
 	}
+}
+
+func startTickConsumer(sc *svc.ServiceContext, s models.Symbol, c *svc.MatchSymbolConsumers) {
+	go func() {
+		tickHandle := handler.NewTickHandle(sc, c.Tick, s)
+		for {
+			message, err := c.Tick.Receive(context.Background())
+			if err != nil {
+				logx.Errorw("tick consumer receive failed", logx.Field("symbol", s.Name), logger.ErrorField(err))
+				continue
+			}
+			tickHandle.Handle(message)
+		}
+	}()
+}
+
+func startTickerConsumer(sc *svc.ServiceContext, s models.Symbol, c *svc.MatchSymbolConsumers) {
+	go func() {
+		tickerHandler := handler.NewTickerHandler(sc, c.Ticker, s)
+		for {
+			message, err := c.Ticker.Receive(context.Background())
+			if err != nil {
+				logx.Errorw("ticker consumer receive failed", logx.Field("symbol", s.Name), logger.ErrorField(err))
+				continue
+			}
+			tickerHandler.Handle(message)
+		}
+	}()
+}
+
+func startKlineConsumer(sc *svc.ServiceContext, s models.Symbol, c *svc.MatchSymbolConsumers) {
+	go func() {
+		klineHandler := handler.NewKlineHandler(sc, c.Kline, s)
+		for {
+			message, err := c.Kline.Receive(context.Background())
+			if err != nil {
+				logx.Errorw("kline consumer receive failed", logx.Field("symbol", s.Name), logger.ErrorField(err))
+				continue
+			}
+			klineHandler.Handle(message)
+		}
+	}()
 }

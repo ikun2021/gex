@@ -40,9 +40,3 @@ func (s *QuoteServiceServer) GetTick(ctx context.Context, in *pb.GetTickReq) (*p
 	l := logic.NewGetTickLogic(ctx, s.svcCtx)
 	return l.GetTick(in)
 }
-
-// 获取深度
-func (s *QuoteServiceServer) GetDepth(ctx context.Context, in *pb.GetDepthReq) (*pb.GetDepthResp, error) {
-	l := logic.NewGetDepthLogic(ctx, s.svcCtx)
-	return l.GetDepth(in)
-}

@@ -49,6 +49,7 @@ func NewKlineHandler(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbo
 		storeLatestKline: make(chan dao.StoreKline),
 		sendChan:         make(chan dao.MemoryKline),
 		ticker:           time.NewTicker(300 * time.Millisecond),
+		consumer:         consumer,
 		svcCtx:           svcCtx,
 		matchData:        make(chan *dao.MatchData, 10),
 		symbolInfo:       symbolInfo,
@@ -75,11 +76,15 @@ func (kl *KlineHandler) Handle(msg pulsar.Message) {
 	var m matchMq.MatchOutput
 	if err := proto.Unmarshal(msg.Payload(), &m); err != nil {
 		logx.Errorw("unmarshal match result failed", logger.ErrorField(err))
-		if err := kl.consumer.Ack(msg); err != nil {
-			logx.Errorw("handler message failed", logger.ErrorField(err))
+		if kl.consumer != nil {
+			if err := kl.consumer.Ack(msg); err != nil {
+				logx.Errorw("handler message failed", logger.ErrorField(err))
+			}
 		}
 		return
 	}
+	logx.Debugf("kline consumer receive message: %v", &m)
+
 	if kl.latestMatchId >= m.MessageId {
 		logx.Slowf("recv ignore current msgId %v recv msgId %v", kl.latestMatchId, m.MessageId)
 		return
@@ -207,7 +212,7 @@ func (kl *KlineHandler) store() {
 						continue
 					}
 				}
-				if klineData.MessageID != nil {
+				if klineData.MessageID != nil && kl.consumer != nil {
 					if err := kl.consumer.AckIDCumulative(klineData.MessageID); err != nil {
 						logx.Errorw("ack kline message failed", logger.ErrorField(err))
 						time.Sleep(time.Second * 3)
@@ -246,7 +251,7 @@ func (kl *KlineHandler) send() {
 			Topic: commonWs.KlinePrefix.WithParam(kl.symbolInfo.Name) + "@" + data.KlineType.String(),
 			Data:  msg.ToBytes(),
 		}); err != nil {
-			logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
+			//logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
 		}
 	}
 }

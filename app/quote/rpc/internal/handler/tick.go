@@ -20,25 +20,29 @@ import (
 
 const tickRedisMaxLen = 500
 
+type tickEnvelope struct {
+	output *matchMq.MatchOutput
+	msgID  pulsar.MessageID
+}
+
 type TickHandle struct {
 	consumer     pulsar.Consumer
 	ticker       *time.Ticker
 	batchData    []*matchMq.MatchResult
 	svcCtx       *svc.ServiceContext
-	msgChan      chan *matchMq.MatchOutput
-	currentMsgId pulsar.MessageID
+	msgChan      chan tickEnvelope
+	pendingAckID pulsar.MessageID
 	sendChan     chan *matchMq.MatchResult
 	symbolInfo   models.Symbol
 	latestMsgId  int64
 }
 
-func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol models.Symbol) TickHandle {
-	ticker := time.NewTicker(time.Minute)
-	t := TickHandle{
+func NewTickHandle(svcCtx *svc.ServiceContext, consumer pulsar.Consumer, symbol models.Symbol) *TickHandle {
+	t := &TickHandle{
 		consumer:   consumer,
-		ticker:     ticker,
+		ticker:     time.NewTicker(time.Minute),
 		svcCtx:     svcCtx,
-		msgChan:    make(chan *matchMq.MatchOutput, 10),
+		msgChan:    make(chan tickEnvelope, 10),
 		symbolInfo: symbol,
 		sendChan:   make(chan *matchMq.MatchResult, 10),
 	}
@@ -53,16 +57,17 @@ func (t *TickHandle) Handle(message pulsar.Message) {
 		logx.Errorw("unmarshal failed", logger.ErrorField(err))
 		return
 	}
+
 	if t.latestMsgId >= m.MessageId {
 		logx.Slowf("recv ignore current msgId %v recv msgId %v", t.latestMsgId, m.MessageId)
 		return
 	}
-	t.msgChan <- &m
+
+	t.msgChan <- tickEnvelope{output: &m, msgID: message.ID()}
 
 	switch r := m.Result.(type) {
 	case *matchMq.MatchOutput_MatchResult:
 		t.sendChan <- r.MatchResult
-		t.currentMsgId = message.ID()
 	}
 }
 
@@ -79,11 +84,12 @@ func (t *TickHandle) commitBatch() {
 		break
 	}
 	t.batchData = t.batchData[:0]
+	t.pendingAckID = nil
 	logx.Info("tick batch commit success")
 }
 
-func (kl *TickHandle) send() {
-	for data := range kl.sendChan {
+func (t *TickHandle) send() {
+	for data := range t.sendChan {
 		for _, v := range data.MatchedRecord {
 			d := commonWs.Tick{
 				Price:        v.Price,
@@ -93,11 +99,11 @@ func (kl *TickHandle) send() {
 				TakerIsBuyer: data.TakerIsBuy,
 			}
 			msg := commonWs.Message[commonWs.Tick]{
-				Topic:   commonWs.TickPrefix.WithParam(kl.symbolInfo.Name),
+				Topic:   commonWs.TickPrefix.WithParam(t.symbolInfo.Name),
 				Payload: d,
 			}
-			if _, err := kl.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
-				Topic: commonWs.TickPrefix.WithParam(kl.symbolInfo.Name),
+			if _, err := t.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
+				Topic: commonWs.TickPrefix.WithParam(t.symbolInfo.Name),
 				Data:  msg.ToBytes(),
 			}); err != nil {
 				logx.Errorw("push tick websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
@@ -106,31 +112,34 @@ func (kl *TickHandle) send() {
 	}
 }
 
-func (t TickHandle) start() {
+func (t *TickHandle) start() {
 	for {
 		select {
 		case <-t.ticker.C:
 			if len(t.batchData) > 0 {
 				t.commitBatch()
 			}
-		case matchResult := <-t.msgChan:
-			switch r := matchResult.Result.(type) {
+		case env := <-t.msgChan:
+			switch r := env.output.Result.(type) {
 			case *matchMq.MatchOutput_MatchResult:
 				t.batchData = append(t.batchData, r.MatchResult)
+				if env.msgID != nil {
+					t.pendingAckID = env.msgID
+				}
 			default:
 				continue
 			}
+			t.latestMsgId = env.output.MessageId
 			if len(t.batchData) >= 100 {
 				t.commitBatch()
 				t.ticker.Reset(2 * time.Second)
 			}
-			t.latestMsgId = matchResult.MessageId
 		}
 	}
 }
 
-func (t TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*matchMq.MatchResult) error {
-	if svcCtx.TickRepo == nil {
+func (t *TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*matchMq.MatchResult) error {
+	if len(insertData) == 0 {
 		return nil
 	}
 
@@ -187,7 +196,21 @@ func (t TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*m
 					CreatedAt:   matchTime,
 				},
 			)
+		}
+	}
 
+	if svcCtx.TickRepo != nil && len(docs) > 0 {
+		if err := svcCtx.TickRepo.InsertMany(ctx, docs); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range insertData {
+		matchTime := v.MatchTime
+		if matchTime > 1e12 {
+			matchTime = matchTime / 1e9
+		}
+		for _, v1 := range v.MatchedRecord {
 			tickPayload := commonWs.Tick{
 				Price:        v1.Price,
 				BaseAmount:   v1.BaseAmount,
@@ -205,12 +228,10 @@ func (t TickHandle) storeMatchResult(svcCtx *svc.ServiceContext, insertData []*m
 		}
 	}
 
-	if err := svcCtx.TickRepo.InsertMany(ctx, docs); err != nil {
-		return err
-	}
-
-	if err := t.consumer.AckIDCumulative(t.currentMsgId); err != nil {
-		return err
+	if t.pendingAckID != nil {
+		if err := t.consumer.AckIDCumulative(t.pendingAckID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

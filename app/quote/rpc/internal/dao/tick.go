@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -84,5 +85,25 @@ func (r *TickRepo) InsertMany(ctx context.Context, docs []*TickDoc) error {
 		return nil
 	}
 	_, err := r.coll.InsertMany(ctx, toInsert, options.InsertMany().SetOrdered(false))
+	if err == nil || isDuplicateKeyBulkErr(err) {
+		return nil
+	}
 	return err
+}
+
+// isDuplicateKeyBulkErr 批量写入若全部为 pk_id 重复（重试/部分成功后的幂等写入），视为成功。
+func isDuplicateKeyBulkErr(err error) bool {
+	var bulkErr mongo.BulkWriteException
+	if errors.As(err, &bulkErr) {
+		if len(bulkErr.WriteErrors) == 0 {
+			return false
+		}
+		for _, we := range bulkErr.WriteErrors {
+			if we.Code != 11000 {
+				return false
+			}
+		}
+		return true
+	}
+	return mongo.IsDuplicateKeyError(err)
 }

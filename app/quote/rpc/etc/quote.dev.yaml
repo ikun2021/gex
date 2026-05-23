@@ -2,32 +2,45 @@ Name: quote.rpc
 ListenOn: 0.0.0.0:8080
 Etcd:
   Hosts:
-    - 127.0.0.1:2379
+    - 192.168.2.159:2379
   Key: quote.rpc
-
+WsConf:
+  etcd:
+    Key: accountRpc
+    Hosts:
+      - 192.168.2.159:2379
+    NonBlock: true
 Symbol:
-  - Name: IKUN_BTC
+  - Name: IKUN_USDT
     Id: 1
     BaseCoin: IKUN
-    QuoteCoin: BTC
-    QuoteCoinId: 1
-    BaseCoinId: 2
-  - Name: IKUN_ETH
+    QuoteCoin: USDT
+    QuoteCoinId: 4
+    BaseCoinId: 1
+    QuoteCoinPrec: 4
+    BaseCoinPrec: 4
+  - Name: ETH_USDT
     Id: 2
-    BaseCoin: IKUN
-    QuoteCoin: ETH
-    QuoteCoinId: 1
-    BaseCoinId: 2
+    BaseCoin: ETH
+    QuoteCoin: USDT
+    QuoteCoinId: 4
+    BaseCoinId: 3
+    QuoteCoinPrec: 4
+    BaseCoinPrec: 4
 Coin:
   - Name: IKUN
     Id: 1
-    Precision: 6
+    Precision: 4
   - Name: BTC
     Id: 2
-    Precision: 8
+    Precision: 4
   - Name: ETH
     Id: 3
-    Precision: 8
+    Precision: 4
+  - Name: USDT
+    Id: 4
+    Precision: 4
+
 
 MongoConf:
   Uri: mongodb://admin:admin@192.168.2.159:27017/?authSource=admin
@@ -35,3 +48,39 @@ MongoConf:
   KlineCollection: kline_history
   TickCollection: tick
   ConnectTimeoutSeconds: 10
+PulsarConfig:
+  hosts:
+    - 192.168.2.159:6650
+
+RedisConf:
+  Host: 192.168.2.159:6379
+  Type: node
+  Pass: "123456"
+  PingTimeout: 5s
+
+
+LoggerConfig:
+  level: debug  #日志等级 debug info warn error
+  stacktrace: true #默认为true 在error级别及以上显示堆栈
+  addCaller: true #默认为true  增加调用者信息
+  callerShip: 3 # 默认为3 调用栈深度
+  mode: console #默认为console 输出到控制台  console file
+  json: false #默认为false  是否json格式化
+  fileName:  #可选 file模式参数 输出到指定文件
+  errorFileName:  #可选 file模式参数 错误日志输出到的地方
+  maxSize: 0 #可选 file模式参数 文件大小限制 单位MB
+  maxAge: 0 #可选 file模式参数 文件最大保存时间 单位天
+  maxBackup: 0 #可选 file模式参数 最大的日志数量
+  async: false #默认为false file模式参数 是否异步落盘。
+  compress: false #默认为false file模式参数 是否压缩
+  console: false #默认为false file模式参数 是否同时输出到控制台
+  color: true #默认为false  输出是否彩色 在开发的时候推荐使用。
+  isReport: false  #默认为false 是否上报到im工具,开启上报的话，需要在程序结束执行sync
+  port: 0 #是否开启http热更新日志级别
+#  reportConfig: # 上报配置 warn级别以上报到im工具
+#    type: lark # 可选 lark(飞书也是这个) wx tg
+#    token: https://open.feishu.cn/open-apis/bot/v2/hook/71f86ea61212-ab9a23-464512-b40b-1be001212ffe910a # lark 飞书填群机器人webhook tg填token wx填key   这个示例地址无效。
+#    chatID: 0 # tg填chatID 其他不用填
+#    flushSec: 3 # 刷新间隔单位为秒 开发测试调小一点，生产环境调大一点
+#    maxCount: 20 #  最大缓存数量 达到刷新间隔或最大记录数 触发发送  开发测试调小一点，生产环境调大一点
+#    level: warn # 指定上报级别

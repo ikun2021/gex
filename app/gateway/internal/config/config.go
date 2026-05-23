@@ -11,5 +11,6 @@ type Config struct {
 	LoggerConfig   zlog.Config
 	AccountRpcConf zrpc.RpcClientConf
 	MatchRpcConf   zrpc.RpcClientConf
+	QuoteRpcConf   zrpc.RpcClientConf
 	LangPath       string
 }

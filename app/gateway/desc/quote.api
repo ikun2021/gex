@@ -117,12 +117,12 @@ type (
 service gateway {
 	@doc "获取k线"
 	@handler GetKlineList
-	get /get_kline_list (KlineListReq) returns (KlineListResp)
+	post /get_kline_list (KlineListReq) returns (KlineListResp)
 	@doc "获取ticker"
 	@handler GetTickerList
-	get /get_ticker_list (GetTickerListReq) returns (GetTickerListResp)
+	post /get_ticker_list (GetTickerListReq) returns (GetTickerListResp)
 	@doc "获取tick成交"
 	@handler GetTickList
-	get /get_tick_list (GetTickReq) returns (GetTickResp)
+	post /get_tick_list (GetTickReq) returns (GetTickResp)
 
 }

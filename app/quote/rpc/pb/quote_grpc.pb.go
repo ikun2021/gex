@@ -22,7 +22,6 @@ const (
 	QuoteService_GetKline_FullMethodName  = "/pb.QuoteService/GetKline"
 	QuoteService_GetTicker_FullMethodName = "/pb.QuoteService/GetTicker"
 	QuoteService_GetTick_FullMethodName   = "/pb.QuoteService/GetTick"
-	QuoteService_GetDepth_FullMethodName  = "/pb.QuoteService/GetDepth"
 )
 
 // QuoteServiceClient is the client API for QuoteService service.
@@ -35,8 +34,6 @@ type QuoteServiceClient interface {
 	GetTicker(ctx context.Context, in *GetTickerReq, opts ...grpc.CallOption) (*GetTickerResp, error)
 	// 获取tick
 	GetTick(ctx context.Context, in *GetTickReq, opts ...grpc.CallOption) (*GetTickResp, error)
-	// 获取深度
-	GetDepth(ctx context.Context, in *GetDepthReq, opts ...grpc.CallOption) (*GetDepthResp, error)
 }
 
 type quoteServiceClient struct {
@@ -74,15 +71,6 @@ func (c *quoteServiceClient) GetTick(ctx context.Context, in *GetTickReq, opts .
 	return out, nil
 }
 
-func (c *quoteServiceClient) GetDepth(ctx context.Context, in *GetDepthReq, opts ...grpc.CallOption) (*GetDepthResp, error) {
-	out := new(GetDepthResp)
-	err := c.cc.Invoke(ctx, QuoteService_GetDepth_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QuoteServiceServer is the server API for QuoteService service.
 // All implementations must embed UnimplementedQuoteServiceServer
 // for forward compatibility
@@ -93,8 +81,6 @@ type QuoteServiceServer interface {
 	GetTicker(context.Context, *GetTickerReq) (*GetTickerResp, error)
 	// 获取tick
 	GetTick(context.Context, *GetTickReq) (*GetTickResp, error)
-	// 获取深度
-	GetDepth(context.Context, *GetDepthReq) (*GetDepthResp, error)
 	mustEmbedUnimplementedQuoteServiceServer()
 }
 
@@ -110,9 +96,6 @@ func (UnimplementedQuoteServiceServer) GetTicker(context.Context, *GetTickerReq)
 }
 func (UnimplementedQuoteServiceServer) GetTick(context.Context, *GetTickReq) (*GetTickResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTick not implemented")
-}
-func (UnimplementedQuoteServiceServer) GetDepth(context.Context, *GetDepthReq) (*GetDepthResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetDepth not implemented")
 }
 func (UnimplementedQuoteServiceServer) mustEmbedUnimplementedQuoteServiceServer() {}
 
@@ -181,24 +164,6 @@ func _QuoteService_GetTick_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QuoteService_GetDepth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetDepthReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuoteServiceServer).GetDepth(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuoteService_GetDepth_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuoteServiceServer).GetDepth(ctx, req.(*GetDepthReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // QuoteService_ServiceDesc is the grpc.ServiceDesc for QuoteService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -217,10 +182,6 @@ var QuoteService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTick",
 			Handler:    _QuoteService_GetTick_Handler,
-		},
-		{
-			MethodName: "GetDepth",
-			Handler:    _QuoteService_GetDepth_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

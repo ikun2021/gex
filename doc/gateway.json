@@ -690,7 +690,10 @@
       }
     },
     "/quotes/v1/get_kline_list": {
-      "get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -806,7 +809,10 @@
       }
     },
     "/quotes/v1/get_tick_list": {
-      "get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -888,7 +894,10 @@
       }
     },
     "/quotes/v1/get_ticker_list": {
-      "get": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -979,7 +988,7 @@
       }
     }
   },
-  "x-date": "2026-05-20 22:59:59",
+  "x-date": "2026-05-23 15:50:10",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
