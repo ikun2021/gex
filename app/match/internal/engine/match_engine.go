@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -876,14 +875,22 @@ func (m *MatchEngine) HandleOrder(order *InputMessage) {
 func (m *MatchEngine) store() {
 	go func() {
 		for snapshotData := range m.storeChan {
-			data, _ := json.Marshal(snapshotData)
+			data, err := marshalSnapshot(snapshotData)
+			if err != nil {
+				logx.Errorf("match engine snapshot marshal failed symbol=%v err=%v", m.symbolConf.Name, err)
+				continue
+			}
 			if err := m.redisClient.Set("match_engine_snapshot:"+cast.ToString(m.symbolConf.Id), string(data)); err != nil {
-				logx.Errorf("store current msg id failed %v", err)
+				logx.Errorf("match engine snapshot save failed symbol=%v err=%v", m.symbolConf.Name, err)
+				continue
 			}
-			if err := m.Consumer.AckIDCumulative(snapshotData.PulsarMsgID); err != nil {
-				logx.Errorf("store ack msg id failed %v", err)
+			if snapshotData.PulsarMsgID != nil {
+				if err := m.Consumer.AckIDCumulative(snapshotData.PulsarMsgID); err != nil {
+					logx.Errorf("match engine snapshot ack failed symbol=%v err=%v", m.symbolConf.Name, err)
+					continue
+				}
 			}
-			logx.Infof("match engine store success symbol=%v msgId=%v", m.symbolConf.Name, m.currentMsgId)
+			logx.Infof("match engine store success symbol=%v msgId=%v", m.symbolConf.Name, snapshotData.CurrentMsgId)
 		}
 	}()
 }
@@ -907,21 +914,29 @@ func (m *MatchEngine) snapshot() {
 }
 
 type SnapshotData struct {
-	Asks         []*InputMessage  `json:"asks"`
-	Bids         []*InputMessage  `json:"bids"`
-	CurrentMsgId int64            `json:"current_msg_id"`
-	PulsarMsgID  pulsar.MessageID `json:"pulsar_msg_id"`
+	Asks         []*InputMessage
+	Bids         []*InputMessage
+	CurrentMsgId int64
+	PulsarMsgID  pulsar.MessageID
 }
 
 func (m *MatchEngine) recover() {
 	key := fmt.Sprintf("match_engine_snapshot:%d", m.symbolConf.Id)
 	val, err := m.redisClient.Get(key)
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			m.DepthHandler = NewDepthHandler(0, &m.symbolConf, m.wsClient)
+			logx.Infof("match engine recover empty snapshot symbol=%v", m.symbolConf.Name)
+			return
+		}
 		logx.Severef("match engine recover failed symbol=%v err=%v", m.symbolConf.Name, err)
+		return
 	}
-	var data SnapshotData
-	if err := json.Unmarshal([]byte(val), &data); err != nil {
+	data, err := unmarshalSnapshot(val)
+	if err != nil {
 		logx.Errorf("match engine recover unmarshal failed symbol=%v err=%v", m.symbolConf.Name, err)
+		m.DepthHandler = NewDepthHandler(0, &m.symbolConf, m.wsClient)
+		return
 	}
 	m.DepthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
 	for _, v := range data.Asks {
@@ -935,10 +950,11 @@ func (m *MatchEngine) recover() {
 		m.DepthHandler.updateDepth(&position{
 			price: v.Price,
 			qty:   v.UnfilledBaseAmount,
-		}, enum.Side_Buy, Delete, v.MessageId)
+		}, enum.Side_Buy, Add, v.MessageId)
 		m.bids.add(v)
 	}
 	m.currentMsgId = data.CurrentMsgId
+	m.currentPulsarMessageId = data.PulsarMsgID
 	m.updateBestAsk()
 	m.updateBestBid()
 
