@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 
+	"github.com/ikun2021/gex/app/account/rpc/client/accountservice"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
 
@@ -24,7 +25,18 @@ func NewValidateTokenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Val
 }
 
 func (l *ValidateTokenLogic) ValidateToken(req *types.ValidateTokenReq) (resp *types.ValidateTokenResp, err error) {
-	// todo: add your logic here and delete this line
+	rpcResp, err := l.svcCtx.AccountRpc.ValidateToken(l.ctx, &accountservice.ValidateTokenReq{
+		Token: req.Token,
+	})
+	if err != nil {
+		l.Logger.Errorf("validate token failed: %v", err)
+		return nil, err
+	}
 
-	return
+	return &types.ValidateTokenResp{
+		UserInfo: &types.UserInfo{
+			Uid:      rpcResp.Uid,
+			Username: rpcResp.Username,
+		},
+	}, nil
 }

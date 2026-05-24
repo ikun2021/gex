@@ -61,45 +61,42 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/get_user_asset_list",
 					Handler: account.GetUserAssetListHandler(serverCtx),
 				},
+				{
+					// 登出（从 Authorization 读取 token）
+					Method:  http.MethodPost,
+					Path:    "/logout",
+					Handler: account.LoginOutHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithPrefix("/account/v1"),
 	)
 
 	server.AddRoutes(
-		[]rest.Route{
-			{
-				// 取消订单
-				Method:  http.MethodPost,
-				Path:    "/cancel_order",
-				Handler: order.CancelOrderHandler(serverCtx),
-			},
-			{
-				// 下单
-				Method:  http.MethodPost,
-				Path:    "/create_order",
-				Handler: order.CreateOrderHandler(serverCtx),
-			},
-			{
-				// 获取用户订单列表
-				Method:  http.MethodPost,
-				Path:    "/get_order_list",
-				Handler: order.GetOrderListHandler(serverCtx),
-			},
-		},
+		rest.WithMiddlewares(
+			[]rest.Middleware{serverCtx.Auth},
+			[]rest.Route{
+				{
+					// 取消订单
+					Method:  http.MethodPost,
+					Path:    "/cancel_order",
+					Handler: order.CancelOrderHandler(serverCtx),
+				},
+				{
+					// 下单
+					Method:  http.MethodPost,
+					Path:    "/create_order",
+					Handler: order.CreateOrderHandler(serverCtx),
+				},
+				{
+					// 获取用户订单列表
+					Method:  http.MethodPost,
+					Path:    "/get_order_list",
+					Handler: order.GetOrderListHandler(serverCtx),
+				},
+			}...,
+		),
 		rest.WithPrefix("/order/v1"),
-	)
-
-	server.AddRoutes(
-		[]rest.Route{
-			{
-				// 获取深度
-				Method:  http.MethodPost,
-				Path:    "/get_depth",
-				Handler: quote.GetDepthHandler(serverCtx),
-			},
-		},
-		rest.WithPrefix("/quotes/v1"),
 	)
 
 	server.AddRoutes(
@@ -121,6 +118,18 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Method:  http.MethodPost,
 				Path:    "/get_ticker_list",
 				Handler: quote.GetTickerListHandler(serverCtx),
+			},
+		},
+		rest.WithPrefix("/quotes/v1"),
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				// 获取深度
+				Method:  http.MethodPost,
+				Path:    "/get_depth",
+				Handler: quote.GetDepthHandler(serverCtx),
 			},
 		},
 		rest.WithPrefix("/quotes/v1"),

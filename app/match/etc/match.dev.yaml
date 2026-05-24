@@ -40,10 +40,10 @@ Coin:
     Precision: 4
 WsConf:
   etcd:
-    Key: accountRpc
+    Key: proxy
     Hosts:
       - 192.168.2.159:2379
-    NonBlock: true
+  NonBlock: true
 etcdRegisterConf:
   etcdConf:
     endpoints: [192.168.2.159:2379]

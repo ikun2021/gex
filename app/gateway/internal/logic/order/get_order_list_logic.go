@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
+	"github.com/ikun2021/gex/app/gateway/internal/ctxdata"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
 	"github.com/ikun2021/gex/common/errs"
@@ -28,6 +29,11 @@ func NewGetOrderListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetO
 }
 
 func (l *GetOrderListLogic) GetOrderList(req *types.GetOrderListReq) (resp *types.GetOrderListResp, err error) {
+	uid, err := ctxdata.GetUid(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var cursorId int64
 	if req.Id != "" {
 		cursorId, err = strconv.ParseInt(req.Id, 10, 64)
@@ -42,7 +48,7 @@ func (l *GetOrderListLogic) GetOrderList(req *types.GetOrderListReq) (resp *type
 	}
 
 	rpcResp, err := l.svcCtx.OrderRpc.GetOrderList(l.ctx, &orderservice.GetOrderListByUserReq{
-		UserId:     1,
+		UserId:     uid,
 		StatusList: statusList,
 		Id:         cursorId,
 		PageSize:   req.PageSize,

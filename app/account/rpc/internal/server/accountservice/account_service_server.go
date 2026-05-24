@@ -42,7 +42,7 @@ func (s *AccountServiceServer) FreezeUserAsset(ctx context.Context, in *pb.Freez
 }
 
 // 解冻用户资产
-func (s *AccountServiceServer) UnFreezeUserAsset(ctx context.Context, in *pb.FreezeUserAssetReq) (*pb.Empty, error) {
+func (s *AccountServiceServer) UnFreezeUserAsset(ctx context.Context, in *pb.UnFreezeUserAssetReq) (*pb.Empty, error) {
 	l := accountservicelogic.NewUnFreezeUserAssetLogic(ctx, s.svcCtx)
 	return l.UnFreezeUserAsset(in)
 }
@@ -77,7 +77,7 @@ func (s *AccountServiceServer) LoginOut(ctx context.Context, in *pb.LoginOutReq)
 	return l.LoginOut(in)
 }
 
-// 验证token是否有效。
+// 验证 token 是否有效
 func (s *AccountServiceServer) ValidateToken(ctx context.Context, in *pb.ValidateTokenReq) (*pb.ValidateTokenResp, error) {
 	l := accountservicelogic.NewValidateTokenLogic(ctx, s.svcCtx)
 	return l.ValidateToken(in)

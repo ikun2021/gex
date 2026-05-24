@@ -6,10 +6,10 @@ Etcd:
   Key: quote.rpc
 WsConf:
   etcd:
-    Key: accountRpc
+    Key: proxy
     Hosts:
       - 192.168.2.159:2379
-    NonBlock: true
+  NonBlock: true
 Symbol:
   - Name: IKUN_USDT
     Id: 1

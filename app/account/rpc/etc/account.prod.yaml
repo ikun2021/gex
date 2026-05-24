@@ -6,20 +6,16 @@ Etcd:
     - etcd:2379
   Key: accountRpc
 
+JwtConf:
+  SignKey: 1c5c04d04fb6705557686aff34299f9c
+  ValidTime: 30d
+
 SymbolEtcdConfig:
   Endpoints:
     - etcd:2379
   DialTimeout: 5
 
 
-GormConf:
-  ip: mysql8
-  port: 3307
-  dbName: trade
-  username: root
-  password: root
-  maxIdleConns: 10
-  maxOpenConns: 100
 LoggerConfig:
   level: debug  #日志等级 debug info warn error
   stacktrace: true #默认为true 在error级别及以上显示堆栈

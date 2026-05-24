@@ -49,7 +49,7 @@ type (
 		// 冻结用户资产。
 		FreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 		// 解冻用户资产
-		UnFreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
+		UnFreezeUserAsset(ctx context.Context, in *UnFreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 		// 扣减用户资产
 		DeductUserAsset(ctx context.Context, in *DeductUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 		// 增加用户资产
@@ -60,7 +60,7 @@ type (
 		Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
 		// 登出
 		LoginOut(ctx context.Context, in *LoginOutReq, opts ...grpc.CallOption) (*Empty, error)
-		// 验证token是否有效。
+		// 验证 token 是否有效
 		ValidateToken(ctx context.Context, in *ValidateTokenReq, opts ...grpc.CallOption) (*ValidateTokenResp, error)
 	}
 
@@ -94,7 +94,7 @@ func (m *defaultAccountService) FreezeUserAsset(ctx context.Context, in *FreezeU
 }
 
 // 解冻用户资产
-func (m *defaultAccountService) UnFreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error) {
+func (m *defaultAccountService) UnFreezeUserAsset(ctx context.Context, in *UnFreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error) {
 	client := pb.NewAccountServiceClient(m.cli.Conn())
 	return client.UnFreezeUserAsset(ctx, in, opts...)
 }
@@ -129,7 +129,7 @@ func (m *defaultAccountService) LoginOut(ctx context.Context, in *LoginOutReq, o
 	return client.LoginOut(ctx, in, opts...)
 }
 
-// 验证token是否有效。
+// 验证 token 是否有效
 func (m *defaultAccountService) ValidateToken(ctx context.Context, in *ValidateTokenReq, opts ...grpc.CallOption) (*ValidateTokenResp, error) {
 	client := pb.NewAccountServiceClient(m.cli.Conn())
 	return client.ValidateToken(ctx, in, opts...)

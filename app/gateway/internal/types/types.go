@@ -119,17 +119,17 @@ type KlineListResp struct {
 }
 
 type LoginReq struct {
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	Captcha   string `json:"captcha"`
-	CaptchaId string `json:"captcha_id"`
+	Username  string `json:"username"`            //用户名
+	Password  string `json:"password"`            //密码
+	Captcha   string `json:"captcha,optional"`    //验证码
+	CaptchaId string `json:"captcha_id,optional"` //验证码ID
 }
 
 type LoginResp struct {
-	Uid        int64  `json:"uid"`         //uid
+	Uid        int64  `json:"uid"`         //用户ID
 	Username   string `json:"username"`    //用户名
-	Token      string `json:"token"`       //token
-	ExpireTime int64  `json:"expire_time"` //到期时间
+	Token      string `json:"token"`       //JWT token
+	ExpireTime int64  `json:"expire_time"` //token过期时间（Unix秒）
 }
 
 type MatchPosition struct {
@@ -190,12 +190,12 @@ type Ticker struct {
 }
 
 type UserInfo struct {
-	Uid      string `json:"uid"`
-	Username string `json:"username"`
+	Uid      int64  `json:"uid"`      //用户ID
+	Username string `json:"username"` //用户名
 }
 
 type ValidateTokenReq struct {
-	Token string `json:"token"`
+	Token string `json:"token"` //JWT token
 }
 
 type ValidateTokenResp struct {

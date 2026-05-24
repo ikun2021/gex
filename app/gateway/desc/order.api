@@ -44,6 +44,7 @@ type (
 @server(
     prefix: /order/v1
     group: order
+    middleware: Auth
 )
 service gateway {
     @doc "下单"

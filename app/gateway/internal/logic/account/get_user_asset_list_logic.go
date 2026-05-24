@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ikun2021/gex/app/account/rpc/client/accountservice"
+	"github.com/ikun2021/gex/app/gateway/internal/ctxdata"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
 
@@ -25,8 +26,10 @@ func NewGetUserAssetListLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *GetUserAssetListLogic) GetUserAssetList() (resp *types.GetUserAssetListResp, err error) {
-	// TODO: 从 Auth 中间件解析登录用户 uid
-	const uid int64 = 1
+	uid, err := ctxdata.GetUid(l.ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	rpcResp, err := l.svcCtx.AccountRpc.GetUserAssetList(l.ctx, &accountservice.GetUserAssetListReq{
 		Uid: uid,

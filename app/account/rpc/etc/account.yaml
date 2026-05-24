@@ -6,7 +6,9 @@ Etcd:
   Hosts:
     - 192.168.2.159:2379
   Key: accountRpc
-
+JwtConf:
+  SignKey: 1c5c04d04fb6705557686aff34299f9c
+  ValidTime: 30d
 Symbol:
   - Name: IKUN_USDT
     Id: 1
@@ -80,4 +82,5 @@ MongoConf:
   Database: trade
   OrderFinalCollection: order_final
   MatchTradeCollection: match_trade
+  UserCollection: user
   ConnectTimeoutSeconds: 10

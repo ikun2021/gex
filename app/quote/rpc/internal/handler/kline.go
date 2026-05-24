@@ -251,7 +251,7 @@ func (kl *KlineHandler) send() {
 			Topic: commonWs.KlinePrefix.WithParam(kl.symbolInfo.Name) + "@" + data.KlineType.String(),
 			Data:  msg.ToBytes(),
 		}); err != nil {
-			//logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
+			logx.Errorw("push kline websocket data failed", logger.ErrorField(err), logx.Field("data", msg))
 		}
 	}
 }

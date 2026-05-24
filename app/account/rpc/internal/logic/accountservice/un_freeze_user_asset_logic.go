@@ -24,7 +24,7 @@ func NewUnFreezeUserAssetLogic(ctx context.Context, svcCtx *svc.ServiceContext) 
 }
 
 // 解冻用户资产
-func (l *UnFreezeUserAssetLogic) UnFreezeUserAsset(in *pb.FreezeUserAssetReq) (*pb.Empty, error) {
+func (l *UnFreezeUserAssetLogic) UnFreezeUserAsset(in *pb.UnFreezeUserAssetReq) (*pb.Empty, error) {
 	// todo: add your logic here and delete this line
 
 	return &pb.Empty{}, nil

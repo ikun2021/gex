@@ -21,6 +21,7 @@ type ServiceContext struct {
 	Config            config.Config
 	MatchConsumerList []pulsar.Consumer
 	JwtClient         *utils.JWT
+	UserRepo          *mongodao.UserRepo
 	RedisCli          *redis.Client
 	MatchProducers    map[string]pulsar.Producer
 	MongoCli          *mongo.Client
@@ -85,11 +86,16 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err := matchTradeRepo.EnsureIndex(context.Background()); err != nil {
 		logx.Errorw("ensure match_trade index failed", logx.Field("err", err))
 	}
+	userRepo := mongodao.NewUserRepo(c.MongoConf.UserColl(mongoCli))
+	if err := userRepo.EnsureIndex(context.Background()); err != nil {
+		logx.Errorw("ensure user index failed", logx.Field("err", err))
+	}
 
 	sc := &ServiceContext{
 		Config:            c,
 		MatchConsumerList: consumers,
-		JwtClient:         utils.NewJWT(),
+		JwtClient:         utils.NewJWT(&c.JwtConf),
+		UserRepo:          userRepo,
 		MatchProducers:    m,
 		MongoCli:          mongoCli,
 		OrderFinalRepo:    orderFinalRepo,

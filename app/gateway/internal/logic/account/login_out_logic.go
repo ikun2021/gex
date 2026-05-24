@@ -7,37 +7,41 @@ import (
 	"github.com/ikun2021/gex/app/gateway/internal/ctxdata"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
+	"github.com/ikun2021/gex/common/errs"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-type AddUserAssetLogic struct {
+type LoginOutLogic struct {
 	logx.Logger
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
 }
 
-func NewAddUserAssetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AddUserAssetLogic {
-	return &AddUserAssetLogic{
+func NewLoginOutLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginOutLogic {
+	return &LoginOutLogic{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
 		svcCtx: svcCtx,
 	}
 }
 
-func (l *AddUserAssetLogic) AddUserAsset(req *types.AddUserAssetReq) (resp *types.Empty, err error) {
+func (l *LoginOutLogic) LoginOut() (resp *types.Empty, err error) {
 	uid, err := ctxdata.GetUid(l.ctx)
 	if err != nil {
 		return nil, err
 	}
+	token := ctxdata.GetToken(l.ctx)
+	if token == "" {
+		return nil, errs.TokenValidateFailed
+	}
 
-	_, err = l.svcCtx.AccountRpc.AddUserAsset(l.ctx, &accountservice.AddUserAssetReq{
-		Uid:      uid,
-		CoinName: req.CoinName,
-		Amount:   req.Qty,
+	_, err = l.svcCtx.AccountRpc.LoginOut(l.ctx, &accountservice.LoginOutReq{
+		Token: token,
+		Uid:   uid,
 	})
 	if err != nil {
-		l.Logger.Errorf("add user asset failed: %v", err)
+		l.Logger.Errorf("logout failed: %v", err)
 		return nil, err
 	}
 	return &types.Empty{}, nil

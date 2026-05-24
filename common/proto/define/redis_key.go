@@ -7,6 +7,7 @@ const (
 	Tick                     RedisKey = "gex:tick"
 	Kline                    RedisKey = "gex:kline"
 	AccountToken             RedisKey = "gex:account:token"
+	AccountSession           RedisKey = "gex:account:session"
 	AccountConsumedMessageId RedisKey = "gex:account:consumed:messageId"
 	OrderConsumedMessageId   RedisKey = "gex:order:consumed:messageId"
 	OpenOrder                RedisKey = "gex:open_order"

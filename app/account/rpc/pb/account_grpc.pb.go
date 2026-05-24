@@ -42,7 +42,7 @@ type AccountServiceClient interface {
 	// 冻结用户资产。
 	FreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 	// 解冻用户资产
-	UnFreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
+	UnFreezeUserAsset(ctx context.Context, in *UnFreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 	// 扣减用户资产
 	DeductUserAsset(ctx context.Context, in *DeductUserAssetReq, opts ...grpc.CallOption) (*Empty, error)
 	// 增加用户资产
@@ -53,7 +53,7 @@ type AccountServiceClient interface {
 	Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
 	// 登出
 	LoginOut(ctx context.Context, in *LoginOutReq, opts ...grpc.CallOption) (*Empty, error)
-	// 验证token是否有效。
+	// 验证 token 是否有效
 	ValidateToken(ctx context.Context, in *ValidateTokenReq, opts ...grpc.CallOption) (*ValidateTokenResp, error)
 }
 
@@ -92,7 +92,7 @@ func (c *accountServiceClient) FreezeUserAsset(ctx context.Context, in *FreezeUs
 	return out, nil
 }
 
-func (c *accountServiceClient) UnFreezeUserAsset(ctx context.Context, in *FreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error) {
+func (c *accountServiceClient) UnFreezeUserAsset(ctx context.Context, in *UnFreezeUserAssetReq, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, AccountService_UnFreezeUserAsset_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -166,7 +166,7 @@ type AccountServiceServer interface {
 	// 冻结用户资产。
 	FreezeUserAsset(context.Context, *FreezeUserAssetReq) (*Empty, error)
 	// 解冻用户资产
-	UnFreezeUserAsset(context.Context, *FreezeUserAssetReq) (*Empty, error)
+	UnFreezeUserAsset(context.Context, *UnFreezeUserAssetReq) (*Empty, error)
 	// 扣减用户资产
 	DeductUserAsset(context.Context, *DeductUserAssetReq) (*Empty, error)
 	// 增加用户资产
@@ -177,7 +177,7 @@ type AccountServiceServer interface {
 	Login(context.Context, *LoginReq) (*LoginResp, error)
 	// 登出
 	LoginOut(context.Context, *LoginOutReq) (*Empty, error)
-	// 验证token是否有效。
+	// 验证 token 是否有效
 	ValidateToken(context.Context, *ValidateTokenReq) (*ValidateTokenResp, error)
 	mustEmbedUnimplementedAccountServiceServer()
 }
@@ -195,7 +195,7 @@ func (UnimplementedAccountServiceServer) GetUserAssetList(context.Context, *GetU
 func (UnimplementedAccountServiceServer) FreezeUserAsset(context.Context, *FreezeUserAssetReq) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FreezeUserAsset not implemented")
 }
-func (UnimplementedAccountServiceServer) UnFreezeUserAsset(context.Context, *FreezeUserAssetReq) (*Empty, error) {
+func (UnimplementedAccountServiceServer) UnFreezeUserAsset(context.Context, *UnFreezeUserAssetReq) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnFreezeUserAsset not implemented")
 }
 func (UnimplementedAccountServiceServer) DeductUserAsset(context.Context, *DeductUserAssetReq) (*Empty, error) {
@@ -284,7 +284,7 @@ func _AccountService_FreezeUserAsset_Handler(srv interface{}, ctx context.Contex
 }
 
 func _AccountService_UnFreezeUserAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FreezeUserAssetReq)
+	in := new(UnFreezeUserAssetReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func _AccountService_UnFreezeUserAsset_Handler(srv interface{}, ctx context.Cont
 		FullMethod: AccountService_UnFreezeUserAsset_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AccountServiceServer).UnFreezeUserAsset(ctx, req.(*FreezeUserAssetReq))
+		return srv.(AccountServiceServer).UnFreezeUserAsset(ctx, req.(*UnFreezeUserAssetReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }

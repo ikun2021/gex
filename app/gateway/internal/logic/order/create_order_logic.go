@@ -2,11 +2,12 @@ package order
 
 import (
 	"context"
-	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
-	"github.com/ikun2021/gex/common/proto/enum"
 
+	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
+	"github.com/ikun2021/gex/app/gateway/internal/ctxdata"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
+	"github.com/ikun2021/gex/common/proto/enum"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -26,9 +27,13 @@ func NewCreateOrderLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Creat
 }
 
 func (l *CreateOrderLogic) CreateOrder(req *types.CreateOrderReq) (resp *types.Empty, err error) {
+	uid, err := ctxdata.GetUid(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = l.svcCtx.OrderRpc.CreateOrder(l.ctx, &orderservice.CreateOrderReq{
-		UserId:      1,
-		SymbolId:    1,
+		UserId:      uid,
 		SymbolName:  req.SymbolName,
 		BaseAmount:  req.BaseAmount,
 		Price:       req.Price,
@@ -38,7 +43,7 @@ func (l *CreateOrderLogic) CreateOrder(req *types.CreateOrderReq) (resp *types.E
 	})
 	if err != nil {
 		l.Logger.Errorf("create order failed: %v", err)
+		return nil, err
 	}
-	return &types.Empty{}, err
-
+	return &types.Empty{}, nil
 }

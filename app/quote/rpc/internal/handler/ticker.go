@@ -239,12 +239,18 @@ func (th *TickerHandler) calculateAndPush() {
 		Payload: ticker,
 	}
 	data, _ := json.Marshal(msg)
-	th.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
+	if _, err := th.svcCtx.WsClient.PushData(context.Background(), &gpush.Data{
 		Topic: msg.Topic,
 		Data:  data,
-	})
+	}); err != nil {
+		logx.Errorf("PushData error: %s", err)
+		return
+	}
 
 	// 更新 Redis
 	tickerData, _ := json.Marshal(ticker)
-	th.svcCtx.RedisClient.Hset(define.Ticker.WithParams(), th.symbolInfo.Name, string(tickerData))
+	if err := th.svcCtx.RedisClient.Hset(define.Ticker.WithParams(), th.symbolInfo.Name, string(tickerData)); err != nil {
+		logx.Errorf("store redis data error: %s", err)
+		return
+	}
 }

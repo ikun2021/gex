@@ -169,21 +169,23 @@
               "type": "object",
               "required": [
                 "username",
-                "password",
-                "captcha",
-                "captcha_id"
+                "password"
               ],
               "properties": {
                 "captcha": {
+                  "description": "验证码",
                   "type": "string"
                 },
                 "captcha_id": {
+                  "description": "验证码ID",
                   "type": "string"
                 },
                 "password": {
+                  "description": "密码",
                   "type": "string"
                 },
                 "username": {
+                  "description": "用户名",
                   "type": "string"
                 }
               }
@@ -197,15 +199,15 @@
               "type": "object",
               "properties": {
                 "expire_time": {
-                  "description": "到期时间",
+                  "description": "token过期时间（Unix秒）",
                   "type": "integer"
                 },
                 "token": {
-                  "description": "token",
+                  "description": "JWT token",
                   "type": "string"
                 },
                 "uid": {
-                  "description": "uid",
+                  "description": "用户ID",
                   "type": "integer"
                 },
                 "username": {
@@ -213,6 +215,26 @@
                   "type": "string"
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    "/account/v1/logout": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "登出（从 Authorization 读取 token）",
+        "operationId": "accountLoginOut",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object"
             }
           }
         }
@@ -303,6 +325,7 @@
               ],
               "properties": {
                 "token": {
+                  "description": "JWT token",
                   "type": "string"
                 }
               }
@@ -323,9 +346,11 @@
                   ],
                   "properties": {
                     "uid": {
-                      "type": "string"
+                      "description": "用户ID",
+                      "type": "integer"
                     },
                     "username": {
+                      "description": "用户名",
                       "type": "string"
                     }
                   }
@@ -988,7 +1013,7 @@
       }
     }
   },
-  "x-date": "2026-05-23 15:50:10",
+  "x-date": "2026-05-24 17:58:58",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

@@ -88,40 +88,51 @@ message RegisterResp{
   //用户ID
   int64  uid=2;
 }
-message LoginReq{
-  //用户名
-  string username=1;
-  //密码
-  string password=2;
+
+// ========== 认证（JWT + Redis 单点登录）==========
+
+// LoginReq 登录请求
+message LoginReq {
+  // 用户名
+  string username = 1;
+  // 密码
+  string password = 2;
 }
 
-message LoginResp{
-  //用户id
-  int64 uid=3;
-  //用户名
-  string username=1;
-  //token
-  string token=2;
-  //token到期时间
-  int64 expire_time=4;
+// LoginResp 登录响应
+message LoginResp {
+  // 用户ID
+  int64 uid = 1;
+  // 用户名
+  string username = 2;
+  // JWT token
+  string token = 3;
+  // token 过期时间（Unix 秒）
+  int64 expire_time = 4;
+}
 
+// LoginOutReq 登出请求
+message LoginOutReq {
+  // JWT token（必填）
+  string token = 1;
+  // 用户ID（可选，以 token 解析结果为准）
+  int64 uid = 2;
 }
-message ValidateTokenReq{
-  //token
-  string token =1;
+
+// ValidateTokenReq 验证 token 请求
+message ValidateTokenReq {
+  // JWT token
+  string token = 1;
 }
-message LoginOutReq{
-  //用户名
-  string uid=1;
-  //token凭证
-  string token=2;
+
+// ValidateTokenResp 验证 token 响应
+message ValidateTokenResp {
+  // 用户ID
+  int64 uid = 1;
+  // 用户名
+  string username = 2;
 }
-message ValidateTokenResp{
-  //用户id
-  int64 uid=1;
-  //用户名
-  string username=2;
-}
+
 service AccountService {
   //获取用户指定币种的资产。
   rpc GetUserAssetByCoin(GetUserAssetReq)returns(GetUserAssetResp);
@@ -130,7 +141,7 @@ service AccountService {
   //冻结用户资产。
   rpc FreezeUserAsset(FreezeUserAssetReq)returns(Empty);
   //解冻用户资产
-  rpc UnFreezeUserAsset(FreezeUserAssetReq)returns(Empty);
+  rpc UnFreezeUserAsset(UnFreezeUserAssetReq)returns(Empty);
   //扣减用户资产
   rpc DeductUserAsset(DeductUserAssetReq)returns(Empty);
   //增加用户资产
@@ -138,12 +149,11 @@ service AccountService {
   //注册
   rpc Register(RegisterReq)returns(RegisterResp);
   //登录
-  rpc Login(LoginReq)returns(LoginResp);
+  rpc Login(LoginReq) returns (LoginResp);
   //登出
-  rpc LoginOut(LoginOutReq)returns(Empty);
-  //验证token是否有效。
-  rpc ValidateToken(ValidateTokenReq)returns(ValidateTokenResp);
-
+  rpc LoginOut(LoginOutReq) returns (Empty);
+  //验证 token 是否有效
+  rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
 }
 
 message OrderEmpty{}

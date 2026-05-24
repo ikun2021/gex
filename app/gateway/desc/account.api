@@ -23,16 +23,16 @@ type (
 )
 type (
 	LoginReq {
-		Username  string `json:"username"`
-		Password  string `json:"password"`
-		Captcha   string `json:"captcha"`
-		CaptchaId string `json:"captcha_id"`
+		Username  string `json:"username"`           //用户名
+		Password  string `json:"password"`           //密码
+		Captcha   string `json:"captcha,optional"`   //验证码
+		CaptchaId string `json:"captcha_id,optional"` //验证码ID
 	}
 	LoginResp {
-		Uid        int64  `json:"uid"`         //uid
-		Username   string `json:"username"`    //用户名
-		Token      string `json:"token"`       //token
-		ExpireTime int64  `json:"expire_time"` //到期时间
+		Uid        int64  `json:"uid"`          //用户ID
+		Username   string `json:"username"`     //用户名
+		Token      string `json:"token"`        //JWT token
+		ExpireTime int64  `json:"expire_time"`  //token过期时间（Unix秒）
 	}
 )
 
@@ -50,11 +50,11 @@ type (
 )
 type (
 	ValidateTokenReq {
-		Token string `json:"token"`
+		Token string `json:"token"` //JWT token
 	}
 	UserInfo {
-		Uid      string `json:"uid"`
-		Username string `json:"username"`
+		Uid      int64  `json:"uid"`      //用户ID
+		Username string `json:"username"` //用户名
 	}
 	ValidateTokenResp {
 		UserInfo *UserInfo `json:"user_info"`
@@ -94,6 +94,9 @@ service gateway {
 	middleware: Auth
 )
 service gateway {
+	@doc "登出（从 Authorization 读取 token）"
+	@handler LoginOut
+	post /logout returns (Empty)
 	@doc "获取用户所有资产"
 	@handler GetUserAssetList
 	post /get_user_asset_list returns(GetUserAssetListResp)

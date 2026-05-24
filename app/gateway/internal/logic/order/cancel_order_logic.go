@@ -2,7 +2,9 @@ package order
 
 import (
 	"context"
+
 	"github.com/ikun2021/gex/app/account/rpc/client/orderservice"
+	"github.com/ikun2021/gex/app/gateway/internal/ctxdata"
 	"github.com/ikun2021/gex/app/gateway/internal/svc"
 	"github.com/ikun2021/gex/app/gateway/internal/types"
 
@@ -24,14 +26,19 @@ func NewCancelOrderLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Cance
 }
 
 func (l *CancelOrderLogic) CancelOrder(req *types.CancelOrderReq) (resp *types.Empty, err error) {
+	uid, err := ctxdata.GetUid(l.ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = l.svcCtx.OrderRpc.CancelOrder(l.ctx, &orderservice.CancelOrderReq{
 		OrderId:    req.ID,
-		Uid:        1,
+		Uid:        uid,
 		SymbolName: req.SymbolName,
 	})
 	if err != nil {
 		l.Logger.Errorf("cancel order failed: %v", err)
+		return nil, err
 	}
-	return &types.Empty{}, err
-
+	return &types.Empty{}, nil
 }

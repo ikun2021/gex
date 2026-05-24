@@ -42,6 +42,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		OrderRpc:   orderRpc,
 		MatchRpc:   matchRpc,
 		QuoteRpc:   quoteRpc,
-		Auth:       middleware.NewAuthMiddleware().Handle,
+		Auth:       middleware.NewAuthMiddleware(cli).Handle,
 	}
 }

@@ -2,11 +2,14 @@ package accountservicelogic
 
 import (
 	"context"
-	"github.com/gookit/goutil/strutil"
+
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	"github.com/ikun2021/gex/app/account/rpc/pb"
 	"github.com/ikun2021/gex/common/errs"
-	"github.com/ikun2021/gex/common/proto/define"
+	"github.com/ikun2021/gex/common/utils"
+	logger "github.com/ikun2021/zlog"
+	"google.golang.org/grpc/status"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -24,16 +27,25 @@ func NewLoginOutLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginOut
 	}
 }
 
-// 登出
+// LoginOut 登出，清除 Redis 中的会话。
 func (l *LoginOutLogic) LoginOut(in *pb.LoginOutReq) (*pb.Empty, error) {
-	_, err := l.svcCtx.JwtClient.ParseToken(in.Token)
+	if in.Token == "" {
+		return nil, errs.WarpMessage(errs.ParamValidateFailed, "token is required")
+	}
+
+	claims, err := l.svcCtx.JwtClient.ParseToken(in.Token)
 	if err != nil {
+		if st, ok := status.FromError(err); ok {
+			if uint32(st.Code()) == utils.TokenExpiredCode {
+				return nil, errs.TokenExpire
+			}
+		}
 		return nil, errs.TokenValidateFailed
 	}
-	tokenMd5 := strutil.Md5(in.Token)
-	if err := l.svcCtx.RedisCli.Del(context.Background(), define.AccountToken.WithParams(tokenMd5)).Err(); err != nil {
-		logx.Errorf("redis del token failed %v", err)
-		return nil, err
+
+	if err := revokeSession(l.ctx, l.svcCtx, claims.Extra.UserId, in.Token); err != nil {
+		logx.Errorw("revoke session failed", logger.ErrorField(err))
+		return nil, errs.RedisErr
 	}
 
 	return &pb.Empty{}, nil
