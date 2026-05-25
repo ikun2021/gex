@@ -131,10 +131,6 @@ Gateway 使用 `.api` 定义 HTTP，通过 etcd 发现 `AccountRpc`、`MatchRpc`
 
 Gateway `Auth` 中间件校验 Token，调用 `AccountRpc.ValidateToken`，请求上下文注入 `userId`。
 
-### 日志上报（可选）
-
-集成 [zlog](https://github.com/ikun2021/zlog)，可将指定级别日志推送到飞书 / 企业微信 / Telegram。
-
 ## 版本与后续
 
 - 架构持续精简：以 **Gateway + 三个 RPC/撮合服务** 为主
