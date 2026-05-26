@@ -1,8 +1,7 @@
 # go 微服务实践 — 基于 go-zero 的数字货币现货交易平台
 
-在线体验（演示机）：http://47.113.223.16
-
-测试账号见 [resource/users.txt](resource/users.txt)
+> **本项目使用 AI（Cursor Agent）对原始仓库进行了大规模重构。**
+> 原始仓库来自 [ikun2021/gex](https://github.com/ikun2021/gex)，在此基础上借助 AI 完成了：架构精简（多服务合并为四进程）、存储层从 MySQL + gorm/gen 迁移至 MongoDB、移除 DTM 分布式事务（改用 Redis Lua 原子脚本）、撮合引擎快照序列化修复、JWT 认证与 Gateway Auth 中间件重写等。
 
 - 后端：https://github.com/ikun2021/gex
 - 前端：https://github.com/ikun2021/gex-ui
@@ -12,7 +11,21 @@
 - 限价单、市价单撮合
 - 行情（盘口、K 线、Tick、Ticker）与个人订单变更的实时推送
 
-## 架构说明（精简版）
+## AI 重构概览
+
+本仓库基于原项目，通过 **Cursor Agent** 驱动完成了以下重构：
+
+| 重构项 | 原方案 | 现方案 |
+|--------|--------|--------|
+| 服务数量 | ~10 个独立 API / RPC / MQ | 4 个核心进程 |
+| 主数据库 | MySQL + gorm/gen | **MongoDB** |
+| 分布式事务 | DTM Saga | **Redis Lua 原子脚本** |
+| 撮合引擎快照 | JSON 序列化（Pulsar MessageID 反序列化失败） | **base64(Serialize) + 兼容旧格式** |
+| 用户认证 | 旧 session / 硬编码 | **JWT + Redis 单点会话** |
+| Gateway 鉴权 | 无 / 分散 | **统一 Auth 中间件**（Bearer Token → AccountRpc.ValidateToken） |
+| 行情接口 | 各服务独立暴露 | Gateway 统一转发 QuoteRpc |
+
+## 架构说明
 
 相较早期多 API / 多 RPC 拆分，当前仓库已**合并大量服务**，核心只保留四个进程：
 
@@ -131,8 +144,16 @@ Gateway 使用 `.api` 定义 HTTP，通过 etcd 发现 `AccountRpc`、`MatchRpc`
 
 Gateway `Auth` 中间件校验 Token，调用 `AccountRpc.ValidateToken`，请求上下文注入 `userId`。
 
+### 日志上报（可选）
+
+集成 [zlog](https://github.com/ikun2021/zlog)，可将指定级别日志推送到飞书 / 企业微信 / Telegram。
+
 ## 版本与后续
 
 - 架构持续精简：以 **Gateway + 三个 RPC/撮合服务** 为主
 - 部署脚本、Makefile、docker-compose 将逐步与 MongoDB 方案对齐
 - 前端完善、k8s 部署等仍在迭代中
+
+---
+
+*本项目的架构重构、存储迁移、认证系统及 Bug 修复均由 AI（Cursor Agent）辅助完成。*
