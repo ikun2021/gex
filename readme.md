@@ -1,10 +1,9 @@
 # go 微服务实践 — 基于 go-zero 的数字货币现货交易平台
 
 > **本项目使用 AI（Cursor Agent）对原始仓库进行了大规模重构。**
-> 原始仓库来自 [ikun2021/gex](https://github.com/ikun2021/gex)，在此基础上借助 AI 完成了：架构精简（多服务合并为四进程）、存储层从 MySQL + gorm/gen 迁移至 MongoDB、移除 DTM 分布式事务（改用 Redis Lua 原子脚本）、撮合引擎快照序列化修复、JWT 认证与 Gateway Auth 中间件重写等。
 
-- 后端：https://github.com/ikun2021/gex
-- 前端：https://github.com/ikun2021/gex-ui
+- 后端：[https://github.com/ikun2021/gex](https://github.com/ikun2021/gex)
+- 前端：[https://github.com/ikun2021/gex-ui](https://github.com/ikun2021/gex-ui)
 
 基于 go-zero 实现现货交易核心能力：
 
@@ -15,33 +14,32 @@
 
 本仓库基于原项目，通过 **Cursor Agent** 驱动完成了以下重构：
 
-| 重构项 | 原方案 | 现方案 |
-|--------|--------|--------|
-| 服务数量 | ~10 个独立 API / RPC / MQ | 4 个核心进程 |
-| 主数据库 | MySQL + gorm/gen | **MongoDB** |
-| 分布式事务 | DTM Saga | **Redis Lua 原子脚本** |
-| 撮合引擎快照 | JSON 序列化（Pulsar MessageID 反序列化失败） | **base64(Serialize) + 兼容旧格式** |
-| 用户认证 | 旧 session / 硬编码 | **JWT + Redis 单点会话** |
-| Gateway 鉴权 | 无 / 分散 | **统一 Auth 中间件**（Bearer Token → AccountRpc.ValidateToken） |
-| 行情接口 | 各服务独立暴露 | Gateway 统一转发 QuoteRpc |
+
+| 重构项        | 原方案                               | 现方案                                                      |
+| ---------- | --------------------------------- | -------------------------------------------------------- |
+| 服务数量       | ~10 个独立 API / RPC / MQ            | 4 个核心进程                                                  |
+| 主数据库       | MySQL + gorm/gen                  | **MongoDB**                                              |
+| 分布式事务      | DTM Saga                          | **Redis Lua 原子脚本**                                       |
+| 撮合引擎快照     | JSON 序列化（Pulsar MessageID 反序列化失败） | **base64(Serialize) + 兼容旧格式**                            |
+| 用户认证       | 旧 session / 硬编码                   | **JWT + Redis 单点会话**                                     |
+| Gateway 鉴权 | 无 / 分散                            | **统一 Auth 中间件**（Bearer Token → AccountRpc.ValidateToken） |
+| 行情接口       | 各服务独立暴露                           | Gateway 统一转发 QuoteRpc                                    |
+
 
 ## 架构说明
 
 相较早期多 API / 多 RPC 拆分，当前仓库已**合并大量服务**，核心只保留四个进程：
 
-| 服务 | 目录 | 说明 |
-|------|------|------|
-| **Gateway** | `app/gateway` | 统一 HTTP 入口，聚合账户、订单、行情、盘口接口 |
-| **Account RPC** | `app/account/rpc` | 用户认证、资产（Redis）、订单与成交归档（MongoDB） |
-| **Match** | `app/match` | 撮合引擎，消费 Pulsar 订单流，盘口与快照存 Redis |
-| **Quote RPC** | `app/quote/rpc` | K 线 / Tick / Ticker，持久化 MongoDB，推送 WebSocket |
 
-已移除或不再作为主路径的组件示例：
+| 服务              | 目录                | 说明                                           |
+| --------------- | ----------------- | -------------------------------------------- |
+| **Gateway**     | `app/gateway`     | 统一 HTTP 入口，聚合账户、订单、行情、盘口接口                   |
+| **Account RPC** | `app/account/rpc` | 用户认证、资产（Redis）、订单与成交归档（MongoDB）              |
+| **Match**       | `app/match`       | 撮合引擎，消费 Pulsar 订单流，盘口与快照存 Redis              |
+| **Quote RPC**   | `app/quote/rpc`   | K 线 / Tick / Ticker，持久化 MongoDB，推送 WebSocket |
 
-- 独立的 `account/api`、`order/api`、`order/rpc`
-- `matchmq` + `matchrpc` 双进程（合并为 `app/match`）
-- 独立的 `quoteapi`、`klinerpc`（合并为 `app/quote/rpc`，由 Gateway 转发）
-- 交易链路 **MySQL + gorm/gen**、**DTM Saga**（资产冻结/扣减改为 **Redis Lua** 原子脚本）
+
+
 
 ```mermaid
 flowchart LR
@@ -60,7 +58,9 @@ flowchart LR
   QuoteRpc --> WS[WebSocket 推送]
 ```
 
-管理后台 `app/admin/api` 仍可选部署（配置类数据，与核心交易链路解耦）。
+
+
+
 
 ## 中间件依赖
 
@@ -80,11 +80,11 @@ flowchart LR
 
 ### 限价单
 
-![](https://cdn.learnku.com/uploads/images/202406/10/51993/bZZs8Xnchx.gif)
+[https://cdn.learnku.com/uploads/images/202605/27/51993/oGBijOSy01.png!large](https://cdn.learnku.com/uploads/images/202605/27/51993/oGBijOSy01.png!large)
 
 ### 市价单
 
-![](https://cdn.learnku.com/uploads/images/202406/10/51993/vVNUSmI7Pp.gif)
+
 
 ## 运行项目
 
@@ -115,7 +115,7 @@ make dep1   # deploy/depend：MongoDB、Redis、Pulsar、etcd、nginx、ws 等
 make dep2   # deploy/dockerfiles：业务容器（若镜像与 Makefile 已同步）
 ```
 
-`Makefile` 中的 `build` / `run` 目标仍指向旧的多服务二进制，**与当前目录结构可能不一致**；以实际上述四个 `app/*` 入口为准。
+`Makefile` 中的 `build` / `run` 目标仍指向旧的多服务二进制，**与当前目录结构可能不一致**；以实际上述四个 `app/`* 入口为准。
 
 ### 3. 访问
 

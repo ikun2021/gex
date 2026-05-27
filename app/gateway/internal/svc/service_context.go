@@ -31,7 +31,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	orderRpc := orderservice.NewOrderService(zrpc.MustNewClient(c.AccountRpcConf))
 	matchRpc := matchservice.NewMatchService(zrpc.MustNewClient(c.MatchRpcConf))
 	quoteRpc := quoteservice.NewQuoteService(zrpc.MustNewClient(c.QuoteRpcConf))
-	translator, err := errs.NewTranslator(c.LangPath)
+	translator, err := errs.NewTranslatorFormFile(c.LangPath)
 	if err != nil {
 		logx.Severef("init translator failed %v", err)
 	}

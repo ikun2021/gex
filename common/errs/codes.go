@@ -28,7 +28,10 @@ func WarpMessage(err error, msg string) error {
 }
 
 func (c Code) Translate(lang string) string {
-	return Translate(lang, cast.ToString(c))
+	if lang == "" {
+		lang = "zh"
+	}
+	return Translate(lang, cast.ToString(uint32(c)))
 }
 
 func (c Code) Error(msg string) error {
