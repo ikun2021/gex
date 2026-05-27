@@ -80,7 +80,7 @@ flowchart LR
 
 ### 限价单
 
-[https://cdn.learnku.com/uploads/images/202605/27/51993/oGBijOSy01.png!large](https://cdn.learnku.com/uploads/images/202605/27/51993/oGBijOSy01.png!large)
+
 
 ### 市价单
 
@@ -139,20 +139,6 @@ Gateway 使用 `.api` 定义 HTTP，通过 etcd 发现 `AccountRpc`、`MatchRpc`
 - 用户资产：Hash + Lua 脚本保证冻结/解冻/扣减原子性
 - 登录会话：JWT + Redis 单点（`gex:account:session:*`）
 - 撮合：订单簿与引擎快照
-
-### 认证
-
-Gateway `Auth` 中间件校验 Token，调用 `AccountRpc.ValidateToken`，请求上下文注入 `userId`。
-
-### 日志上报（可选）
-
-集成 [zlog](https://github.com/ikun2021/zlog)，可将指定级别日志推送到飞书 / 企业微信 / Telegram。
-
-## 版本与后续
-
-- 架构持续精简：以 **Gateway + 三个 RPC/撮合服务** 为主
-- 部署脚本、Makefile、docker-compose 将逐步与 MongoDB 方案对齐
-- 前端完善、k8s 部署等仍在迭代中
 
 ---
 
