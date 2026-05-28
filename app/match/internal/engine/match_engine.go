@@ -858,7 +858,11 @@ func (m *MatchEngine) Start() {
 				m.version++
 				isUpdated = true
 				m.currentPulsarMessageId = order.PulsarMsgId
-				m.currentMsgId = order.MessageId
+				// Pulsar 的消息顺序与业务 message_id 不一定单调（并发下单可能出现乱序/穿插）。
+				// 为避免深度版本号/快照 currentMsgId 回退，这里保持 currentMsgId 单调递增。
+				if order.MessageId > m.currentMsgId {
+					m.currentMsgId = order.MessageId
+				}
 				m.handle(order)
 				if m.version%2000 == 0 {
 					m.snapshot()

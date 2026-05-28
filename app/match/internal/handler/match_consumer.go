@@ -66,11 +66,6 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 					continue
 				}
 
-				if me.Gte(matchReq.MessageId) {
-					logx.Slowf("current msg id %v", matchReq.MessageId)
-					continue
-				}
-
 				logx.Infof("receive message data %v", &matchReq)
 				var inputMessage *engine.InputMessage
 				switch event := matchReq.Event.(type) {
