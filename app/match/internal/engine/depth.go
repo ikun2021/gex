@@ -29,8 +29,8 @@ type DepthHandler struct {
 	paramChan           chan *param
 	proxyClient         ws.ProxyClient
 	symbolInfo          *models.Symbol
-	currentVersion,     //当前版本
-	lastVersion int64 //上一个版本
+	currentVersion      int64 // 深度推送当前版本
+	lastVersion         int64 // 深度推送上一版本
 }
 
 type DepthData struct {
@@ -202,6 +202,10 @@ func (d *DepthHandler) handeUpdateDepth() {
 	}
 
 }
+func (d *DepthHandler) setEngineVersion(v int64) {
+	d.currentVersion = v
+}
+
 func (d *DepthHandler) updateDepth(p *position, side enum.Side, op opType, version int64) {
 	par := &param{
 		p:       p,

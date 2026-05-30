@@ -11,6 +11,7 @@ func TestSnapshotMessageIDRoundTrip(t *testing.T) {
 	orig := pulsar.NewMessageID(808479063773317, 808479069040773, 0, 0)
 	data := &SnapshotData{
 		CurrentMsgId: 42,
+		Version:      100,
 		PulsarMsgID:  orig,
 	}
 	raw, err := marshalSnapshot(data)
@@ -23,6 +24,9 @@ func TestSnapshotMessageIDRoundTrip(t *testing.T) {
 	}
 	if got.CurrentMsgId != 42 {
 		t.Fatalf("msg id: got %d want 42", got.CurrentMsgId)
+	}
+	if got.Version != 100 {
+		t.Fatalf("version: got %d want 100", got.Version)
 	}
 	if got.PulsarMsgID == nil || got.PulsarMsgID.String() != orig.String() {
 		t.Fatalf("pulsar id: got %v want %v", got.PulsarMsgID, orig)

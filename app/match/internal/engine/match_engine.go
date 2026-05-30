@@ -25,23 +25,22 @@ import (
 
 // MatchEngine 撮合引擎
 type MatchEngine struct {
-	asks                   *OrderBook      //卖盘
-	bids                   *OrderBook      //买盘
-	bestBid                decimal.Decimal //买一价
-	bestAsk                decimal.Decimal //卖一价
-	symbolConf             models.Symbol
-	producer               pulsar.Producer
-	currentMsgId           int64
-	quoteCoinPrecision     int32
-	baseCoinPrecision      int32
-	redisClient            *redis.Redis
-	input                  chan *InputMessage
-	storeChan              chan *SnapshotData
-	version                int64
-	currentPulsarMessageId pulsar.MessageID
-	DepthHandler           *DepthHandler
-	wsClient               ws.ProxyClient
-	Consumer               pulsar.Consumer
+	asks               *OrderBook      //卖盘
+	bids               *OrderBook      //买盘
+	bestBid            decimal.Decimal //买一价
+	bestAsk            decimal.Decimal //卖一价
+	symbolConf         models.Symbol
+	producer           pulsar.Producer
+	currentMsgId       int64
+	quoteCoinPrecision int32
+	baseCoinPrecision  int32
+	redisClient        *redis.Redis
+	input              chan *InputMessage
+	storeChan          chan *SnapshotData
+	version            int64
+	DepthHandler       *DepthHandler
+	wsClient           ws.ProxyClient
+	Consumer           pulsar.Consumer
 }
 
 func (m *MatchEngine) Gte(msgId int64) bool {
@@ -306,6 +305,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *InputMessage) {
 			TakerIsBuy:     false,
 		},
 		MsgType: MsgTypeMatchResult,
+		MsgId:   takerOrder.MessageId,
 	}
 	//如果没有买盘，直接取消订单
 	if m.bids.orderBook.Size() == 0 {
@@ -427,6 +427,7 @@ func (m *MatchEngine) matchMarketOrderSell(takerOrder *InputMessage) {
 				Uid:      takerOrder.Uid,
 			},
 			MsgType: MsgTypeCancelResult,
+			MsgId:   takerOrder.MessageId,
 		}
 		//发送取消订单
 		m.SendResult(r)
@@ -443,6 +444,7 @@ func (m *MatchEngine) matchMarkerOrderBuy(takerOrder *InputMessage) {
 			TakerIsBuy:     true,
 		},
 		MsgType: MsgTypeMatchResult,
+		MsgId:   takerOrder.MessageId,
 	}
 	//如果没有卖盘，直接取消订单
 	if m.asks.orderBook.Size() == 0 {
@@ -572,7 +574,10 @@ LOOP:
 			CoinId:   m.symbolConf.QuoteCoinId,
 			Amount:   takerOrder.UnfilledQuoteAmount.String(),
 			Uid:      takerOrder.Uid,
-		}}
+		},
+			MsgType: MsgTypeCancelResult,
+			MsgId:   takerOrder.MessageId,
+		}
 		//发送取消订单
 		m.SendResult(r)
 
@@ -587,6 +592,7 @@ func (m *MatchEngine) matchLimitOrderBuy(takerOrder *InputMessage) {
 			TakerIsBuy:     true,
 		},
 		MsgType: MsgTypeMatchResult,
+		MsgId:   takerOrder.MessageId,
 	}
 	//买单从卖盘中找
 	iterator := m.asks.orderBook.Iterator()
@@ -719,6 +725,7 @@ func (m *MatchEngine) matchLimitOrderSell(takerOrder *InputMessage) {
 			TakerIsBuy:     false,
 		},
 		MsgType: MsgTypeMatchResult,
+		MsgId:   takerOrder.MessageId,
 	}
 	//遍历买盘
 	iterator := m.bids.orderBook.Iterator()
@@ -845,19 +852,23 @@ func (m *MatchEngine) Start() {
 	m.store()
 	ticker := time.NewTicker(time.Second * 10)
 	isUpdated := false
+	var lastPulsarMsgId pulsar.MessageID
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
 				if isUpdated {
 					//执行持久化
-					m.snapshot()
+					m.snapshot(lastPulsarMsgId)
 					isUpdated = false
 				}
 			case order := <-m.input:
 				m.version++
+				if m.DepthHandler != nil {
+					m.DepthHandler.setEngineVersion(m.version)
+				}
 				isUpdated = true
-				m.currentPulsarMessageId = order.PulsarMsgId
+				lastPulsarMsgId = order.PulsarMsgId
 				// Pulsar 的消息顺序与业务 message_id 不一定单调（并发下单可能出现乱序/穿插）。
 				// 为避免深度版本号/快照 currentMsgId 回退，这里保持 currentMsgId 单调递增。
 				if order.MessageId > m.currentMsgId {
@@ -865,7 +876,7 @@ func (m *MatchEngine) Start() {
 				}
 				m.handle(order)
 				if m.version%2000 == 0 {
-					m.snapshot()
+					m.snapshot(lastPulsarMsgId)
 				}
 
 			}
@@ -894,18 +905,19 @@ func (m *MatchEngine) store() {
 					continue
 				}
 			}
-			logx.Infof("match engine store success symbol=%v msgId=%v", m.symbolConf.Name, snapshotData.CurrentMsgId)
+			logx.Infof("match engine store success symbol=%v msgId=%v version=%v", m.symbolConf.Name, snapshotData.CurrentMsgId, snapshotData.Version)
 		}
 	}()
 }
 
-func (m *MatchEngine) snapshot() {
+func (m *MatchEngine) snapshot(pulsarMsgID pulsar.MessageID) {
 	//持久化
 	data := &SnapshotData{
 		Asks:         make([]*InputMessage, 0, m.asks.orderBook.Size()),
 		Bids:         make([]*InputMessage, 0, m.bids.orderBook.Size()),
 		CurrentMsgId: m.currentMsgId,
-		PulsarMsgID:  m.currentPulsarMessageId,
+		Version:      m.version,
+		PulsarMsgID:  pulsarMsgID,
 	}
 	for _, v := range m.asks.orderBook.Values() {
 		data.Asks = append(data.Asks, v.(*InputMessage))
@@ -921,6 +933,7 @@ type SnapshotData struct {
 	Asks         []*InputMessage
 	Bids         []*InputMessage
 	CurrentMsgId int64
+	Version      int64
 	PulsarMsgID  pulsar.MessageID
 }
 
@@ -942,7 +955,8 @@ func (m *MatchEngine) recover() {
 		m.DepthHandler = NewDepthHandler(0, &m.symbolConf, m.wsClient)
 		return
 	}
-	m.DepthHandler = NewDepthHandler(data.CurrentMsgId, &m.symbolConf, m.wsClient)
+	m.version = data.Version
+	m.DepthHandler = NewDepthHandler(data.Version, &m.symbolConf, m.wsClient)
 	for _, v := range data.Asks {
 		m.DepthHandler.updateDepth(&position{
 			price: v.Price,
@@ -958,11 +972,22 @@ func (m *MatchEngine) recover() {
 		m.bids.add(v)
 	}
 	m.currentMsgId = data.CurrentMsgId
-	m.currentPulsarMessageId = data.PulsarMsgID
+	m.DepthHandler.setEngineVersion(m.version)
+
 	m.updateBestAsk()
 	m.updateBestBid()
 
-	logx.Infof("match engine recover success symbol=%v msgId=%v asks=%d bids=%d", m.symbolConf.Name, m.currentMsgId, len(data.Asks), len(data.Bids))
+	if data.PulsarMsgID != nil {
+		if err := m.Consumer.Seek(data.PulsarMsgID); err != nil {
+			logx.Errorf("match engine consumer seek failed symbol=%v msgId=%v pulsarMsgId=%v err=%v",
+				m.symbolConf.Name, data.CurrentMsgId, data.PulsarMsgID, err)
+		} else {
+			logx.Infof("match engine consumer seek success symbol=%v msgId=%v pulsarMsgId=%v",
+				m.symbolConf.Name, data.CurrentMsgId, data.PulsarMsgID)
+		}
+	}
+
+	logx.Infof("match engine recover success symbol=%v msgId=%v version=%v asks=%d bids=%d", m.symbolConf.Name, m.currentMsgId, m.version, len(data.Asks), len(data.Bids))
 }
 
 func (m *MatchEngine) handle(inputMsg *InputMessage) {
@@ -1018,7 +1043,7 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 				OrderType: inputMsg.OrderType,
 			},
 			MsgType: MsgTypeCancelResult,
-			MsgId:   m.currentMsgId,
+			MsgId:   inputMsg.MessageId,
 		})
 	} else {
 		//logx.Debugf("处理之前")
@@ -1048,17 +1073,6 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 			m.matchMarketOrderSell(inputMsg)
 		//买单限价单,发送一条accepted消息
 		case inputMsg.Side == enum.Side_Sell && inputMsg.OrderType == enum.OrderType_LO:
-			m.SendResult(&MatchOutputMessage{
-				AcceptedResult: &AcceptedResult{
-					OrderId:     inputMsg.OrderID,
-					Uid:         inputMsg.Uid,
-					side:        inputMsg.Side,
-					price:       inputMsg.Price.String(),
-					quoteAmount: inputMsg.QuoteAmount.String(),
-					baseAmount:  inputMsg.BaseAmount.String(),
-				},
-				MsgType: MsgTypeAcceptedResult,
-			})
 
 			if inputMsg.Price.LessThanOrEqual(m.bestBid) && m.bestBid.GreaterThan(utils.DecimalZeroMaxPrec) {
 				m.matchLimitOrderSell(inputMsg)
@@ -1083,7 +1097,10 @@ func (m *MatchEngine) handle(inputMsg *InputMessage) {
 // SendResult 发送撮合结果，这个操作不异步。
 func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 	var resp matchMq.MatchOutput
-	resp.MessageId = m.currentMsgId
+	resp.MessageId = matchMsg.MsgId
+	if resp.MessageId == 0 {
+		resp.MessageId = m.currentMsgId
+	}
 	switch matchMsg.MsgType {
 	case MsgTypeMatchResult:
 		matchResult := matchMsg.MatchResult
@@ -1192,7 +1209,7 @@ func (m *MatchEngine) SendResult(matchMsg *MatchOutputMessage) {
 		}
 		logx.Infof("send cancel result %+v to topic %s", &resp, m.producer.Topic())
 	case MsgTypeAcceptedResult:
-
+		logx.Debugf("recv accepted %v", &resp)
 	}
 
 	logx.Infof("send match result %v to topic %s", &resp, m.producer.Topic())

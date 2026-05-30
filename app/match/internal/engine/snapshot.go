@@ -13,6 +13,7 @@ type snapshotJSON struct {
 	Asks         []*InputMessage `json:"asks"`
 	Bids         []*InputMessage `json:"bids"`
 	CurrentMsgId int64           `json:"current_msg_id"`
+	Version      int64           `json:"version"`
 	PulsarMsgID  string          `json:"pulsar_msg_id"`
 }
 
@@ -67,6 +68,7 @@ func marshalSnapshot(data *SnapshotData) ([]byte, error) {
 		Asks:         data.Asks,
 		Bids:         data.Bids,
 		CurrentMsgId: data.CurrentMsgId,
+		Version:      data.Version,
 		PulsarMsgID:  encodeMessageID(data.PulsarMsgID),
 	})
 }
@@ -79,6 +81,7 @@ func unmarshalSnapshot(val string) (*SnapshotData, error) {
 		Asks         []*InputMessage `json:"asks"`
 		Bids         []*InputMessage `json:"bids"`
 		CurrentMsgId int64           `json:"current_msg_id"`
+		Version      int64           `json:"version"`
 		PulsarMsgID  json.RawMessage `json:"pulsar_msg_id"`
 	}
 	if err := json.Unmarshal([]byte(val), &raw); err != nil {
@@ -92,6 +95,7 @@ func unmarshalSnapshot(val string) (*SnapshotData, error) {
 		Asks:         raw.Asks,
 		Bids:         raw.Bids,
 		CurrentMsgId: raw.CurrentMsgId,
+		Version:      raw.Version,
 		PulsarMsgID:  msgID,
 	}, nil
 }

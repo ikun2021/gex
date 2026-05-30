@@ -35,6 +35,7 @@ func InitMatchHandler(sc *svc.ServiceContext) {
 				Topic:            inputTopic.BuildTopic(),
 				SubscriptionName: "match_" + symbol.Name,
 			})
+
 			if err != nil {
 				logx.Severef("init match handler error:%v", err)
 			}

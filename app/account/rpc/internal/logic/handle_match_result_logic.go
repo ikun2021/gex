@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ikun2021/gex/app/account/rpc/internal/svc"
 	matchMq "github.com/ikun2021/gex/common/proto/mq/match"
@@ -21,57 +20,47 @@ import (
 // ARGV[i*10 + 3]: makerBalanceKey
 // ARGV[i*10 + 4]: takerOpenOrdersKey
 // ARGV[i*10 + 5]: makerOpenOrdersKey
-// ARGV[i*10 + 6]: idempotentKey
-// ARGV[i*10 + 7]: takerFrozenField, takerAvailField, takerFrozenDeduct, takerAvailAdd
-// ARGV[i*10 + 8]: makerFrozenField, makerAvailField, makerFrozenDeduct, makerAvailAdd
-// ARGV[i*10 + 9]: takerOrderId, takerOrderStatus
-// ARGV[index + 10]: makerOrderId, makerOrderStatus
-// 每条记录 stride=20 个 ARGV 槽位
+// ARGV[i*10 + 6]: takerFrozenField, takerAvailField, takerFrozenDeduct, takerAvailAdd
+// ARGV[i*10 + 7]: makerFrozenField, makerAvailField, makerFrozenDeduct, makerAvailAdd
+// ARGV[i*10 + 8]: takerOrderId, takerOrderStatus
+// ARGV[index + 9]: makerOrderId, makerOrderStatus
+// 每条记录 stride=18 个 ARGV 槽位
 var atomicSettleBatchScript = redis.NewScript(`
 local count = tonumber(ARGV[1])
-local stride = 20
+local stride = 18
 for i=0, count-1 do
     local offset = i * stride + 1
     local takerBalanceKey = ARGV[offset + 1]
     local makerBalanceKey = ARGV[offset + 2]
     local takerOpenOrdersKey = ARGV[offset + 3]
     local makerOpenOrdersKey = ARGV[offset + 4]
-    local idempotentKey = ARGV[offset + 5]
-    
-    if redis.call("EXISTS", idempotentKey) == 0 then
-        local takerFrozenField = ARGV[offset + 6]
-        local takerAvailField = ARGV[offset + 7]
-        local takerFrozenDeduct = tonumber(ARGV[offset + 8])
-        local takerAvailAdd = tonumber(ARGV[offset + 9])
-        
-        local makerFrozenField = ARGV[offset + 10]
-        local makerAvailField = ARGV[offset + 11]
-        local makerFrozenDeduct = tonumber(ARGV[offset + 12])
-        local makerAvailAdd = tonumber(ARGV[offset + 13])
-        
-        local takerOrderId = ARGV[offset + 14]
-        local takerOrderStatus = tonumber(ARGV[offset + 15])
-        local makerOrderId = ARGV[offset + 16]
-        local makerOrderStatus = tonumber(ARGV[offset + 17])
-        local idempotentEx = tonumber(ARGV[offset + 18])
-        local takerActiveOrdersKey = ARGV[offset + 19]
-        local makerActiveOrdersKey = ARGV[offset + 20]
+    local takerFrozenField = ARGV[offset + 5]
+    local takerAvailField = ARGV[offset + 6]
+    local takerFrozenDeduct = tonumber(ARGV[offset + 7])
+    local takerAvailAdd = tonumber(ARGV[offset + 8])
+    local makerFrozenField = ARGV[offset + 9]
+    local makerAvailField = ARGV[offset + 10]
+    local makerFrozenDeduct = tonumber(ARGV[offset + 11])
+    local makerAvailAdd = tonumber(ARGV[offset + 12])
+    local takerOrderId = ARGV[offset + 13]
+    local takerOrderStatus = tonumber(ARGV[offset + 14])
+    local makerOrderId = ARGV[offset + 15]
+    local makerOrderStatus = tonumber(ARGV[offset + 16])
+    local takerActiveOrdersKey = ARGV[offset + 17]
+    local makerActiveOrdersKey = ARGV[offset + 18]
 
-        redis.call("HINCRBY", takerBalanceKey, takerFrozenField, -takerFrozenDeduct)
-        redis.call("HINCRBY", takerBalanceKey, takerAvailField, takerAvailAdd)
-        redis.call("HINCRBY", makerBalanceKey, makerFrozenField, -makerFrozenDeduct)
-        redis.call("HINCRBY", makerBalanceKey, makerAvailField, makerAvailAdd)
+    redis.call("HINCRBY", takerBalanceKey, takerFrozenField, -takerFrozenDeduct)
+    redis.call("HINCRBY", takerBalanceKey, takerAvailField, takerAvailAdd)
+    redis.call("HINCRBY", makerBalanceKey, makerFrozenField, -makerFrozenDeduct)
+    redis.call("HINCRBY", makerBalanceKey, makerAvailField, makerAvailAdd)
 
-        if takerOrderStatus == 3 or takerOrderStatus == 4 then
-            redis.call("ZREM", takerOpenOrdersKey, takerOrderId)
-            redis.call("HDEL", takerActiveOrdersKey, takerOrderId)
-        end
-        if makerOrderStatus == 3 or makerOrderStatus == 4 then
-            redis.call("ZREM", makerOpenOrdersKey, makerOrderId)
-            redis.call("HDEL", makerActiveOrdersKey, makerOrderId)
-        end
-
-        redis.call("SET", idempotentKey, "1", "EX", idempotentEx)
+    if takerOrderStatus == 3 or takerOrderStatus == 4 then
+        redis.call("ZREM", takerOpenOrdersKey, takerOrderId)
+        redis.call("HDEL", takerActiveOrdersKey, takerOrderId)
+    end
+    if makerOrderStatus == 3 or makerOrderStatus == 4 then
+        redis.call("ZREM", makerOpenOrdersKey, makerOrderId)
+        redis.call("HDEL", makerActiveOrdersKey, makerOrderId)
     end
 end
 return 1
@@ -81,16 +70,11 @@ return 1
 // KEYS[1]: balanceKey
 // KEYS[2]: activeOrdersKey
 // KEYS[3]: openOrdersKey
-// KEYS[4]: idempotentKey
 var atomicCancelScript = redis.NewScript(`
-if redis.call("EXISTS", KEYS[4]) == 1 then
-    return 1
-end
 redis.call("HINCRBY", KEYS[1], ARGV[1], -tonumber(ARGV[3]))
 redis.call("HINCRBY", KEYS[1], ARGV[2], tonumber(ARGV[3]))
 redis.call("HDEL", KEYS[2], ARGV[4])
 redis.call("ZREM", KEYS[3], ARGV[4])
-redis.call("SET", KEYS[4], "1", "EX", ARGV[5])
 return 1
 `)
 
@@ -170,9 +154,8 @@ func (l *HandleMatchResultLogic) HandleMatchResult(result *matchMq.MatchOutput_M
 		return fmt.Errorf("persist settle archive to mongodb failed: %w", err)
 	}
 
-	// 存储已消费的消息ID（用于幂等性）
 	if err := storeConsumedMessageId(); err != nil {
-		logx.Errorw("store consumed message id failed",
+		logx.Errorw("ack match result message failed",
 			logx.Field("matchId", match.MatchId),
 			logx.Field("error", err.Error()))
 		return err
@@ -253,14 +236,12 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 	makerOpenOrdersKey := rediskeys.UserOpenOrdersKey(tagMaker, maker.Uid)
 	takerActiveOrdersKey := rediskeys.UserActiveOrdersKey(tagTaker, taker.Uid)
 	makerActiveOrdersKey := rediskeys.UserActiveOrdersKey(tagMaker, maker.Uid)
-	idempotentKey := fmt.Sprintf("match_processed:%s:%s", record.MatchSubId, tagTaker)
 
 	return []interface{}{
 		takerBalanceKey,
 		makerBalanceKey,
 		takerOpenOrdersKey,
 		makerOpenOrdersKey,
-		idempotentKey,
 		takerFrozenField,
 		takerAvailField,
 		takerFrozenDeduct,
@@ -273,7 +254,6 @@ func (l *HandleMatchResultLogic) getSettleRecordArgs(matchResult *matchMq.MatchR
 		int32(taker.OrderStatus),
 		maker.OrderId,
 		int32(maker.OrderStatus),
-		3600 * 24,
 		takerActiveOrdersKey,
 		makerActiveOrdersKey,
 	}, nil
@@ -332,15 +312,13 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	balanceKey := rediskeys.UserBalanceKey(tag, res.Uid)
 	activeOrdersKey := rediskeys.UserActiveOrdersKey(tag, res.Uid)
 	openOrdersKey := rediskeys.UserOpenOrdersKey(tag, res.Uid)
-	idempotentKey := fmt.Sprintf("match_processed:cancel:%d:%s", messageId, tag)
 
-	keys := []string{balanceKey, activeOrdersKey, openOrdersKey, idempotentKey}
+	keys := []string{balanceKey, activeOrdersKey, openOrdersKey}
 	args := []interface{}{
 		coinName + "_frozen",
 		coinName,
 		unfreezeAmount,
 		res.OrderId,
-		3600 * 24,
 	}
 
 	logx.Infow("execute redis cancel lua",
@@ -378,26 +356,8 @@ func (l *HandleMatchResultLogic) HandleCancelOrder(cancelResp *matchMq.CancelRes
 	return nil
 }
 
-// HandleAcceptOrder 订单入簿确认：有序索引已在下单时写入，此处仅做幂等标记。
+// HandleAcceptOrder 订单入簿确认：有序索引已在下单时写入。
 func (l *HandleMatchResultLogic) HandleAcceptOrder(acceptResult *matchMq.AcceptedResult, messageId int64) error {
-	tag := l.getTag(acceptResult.Uid)
-	idempotentKey := fmt.Sprintf("match_processed:accept:%d:%s", messageId, tag)
-	ctx := context.Background()
-
-	ok, err := l.svcCtx.RedisCli.SetNX(ctx, idempotentKey, "1", 24*time.Hour).Result()
-	if err != nil {
-		logx.Errorw("mark accept processed failed",
-			logx.Field("messageId", messageId),
-			logx.Field("orderId", acceptResult.OrderId),
-			logx.Field("error", err.Error()))
-		return fmt.Errorf("mark accept processed failed: %w", err)
-	}
-	if !ok {
-		logx.Infow("accept result already processed",
-			logx.Field("messageId", messageId),
-			logx.Field("orderId", acceptResult.OrderId))
-		return nil
-	}
 	logx.Infow("handle accept result success",
 		logx.Field("messageId", messageId),
 		logx.Field("orderId", acceptResult.OrderId),
