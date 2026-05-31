@@ -33,7 +33,7 @@ func (l *GetUserAssetListLogic) GetUserAssetList(in *pb.GetUserAssetListReq) (*p
 	tag := rediskeys.UserSlotTag(in.Uid)
 	balanceKey := rediskeys.UserBalanceKey(tag, in.Uid)
 
-	fields, err := l.svcCtx.RedisCli.HGetAll(l.ctx, balanceKey).Result()
+	fields, err := l.svcCtx.RedisCli.HGetAll(context.Background(), balanceKey).Result()
 	if err != nil {
 		logx.Errorw("hgetall user balance failed", logx.Field("uid", in.Uid), logx.Field("err", err))
 		return nil, fmt.Errorf("get user balance from redis failed: %w", err)

@@ -1,4 +1,4 @@
-FROM docker.1panel.live/library/busybox
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/busybox:1.38.0
 WORKDIR /app
 COPY bin/quoterpc /app/quoterpc
-COPY deploy/config/quote.rpc.yaml /app/quote.rpc.yaml
+COPY app/quote/rpc/etc/quote.prod.yaml /app/quote.rpc.yaml

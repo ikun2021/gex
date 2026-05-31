@@ -46,27 +46,80 @@ flowchart LR
 
 核心链路依赖：
 
-- **MongoDB**：用户、订单终态、成交记录、K 线、Tick 等
+- **MongoDB**（`mongo:8.0` standalone）：用户、订单终态、成交记录、K 线、Tick 等
 - **Redis**：用户资产、会话、撮合盘口与快照、行情缓存
 - **Apache Pulsar**：订单与撮合结果消息
 - **etcd**：RPC 服务注册发现
 - **WebSocket**（`deploy/depend/ws`）：行情与订单推送
 
-本地开发可参考各服务 `etc/*.yaml` 中的 `MongoConf`、`RedisConf`、`Pulsar` 等配置。
+本地开发使用 `app/*/etc/*.yaml` 或 `*.dev.yaml`，连接 Docker 依赖的**宿主机映射端口**（Etcd `12379`、Pulsar `16650`、Redis `16379`、MongoDB `37017`）。容器部署使用 `*.prod.yaml`（服务名 + 容器内默认端口）。
 
-> **说明**：`deploy/depend/docker-compose.yaml` 中可能仍包含 MySQL、DTM 等历史依赖容器；**当前交易与账户主数据已迁移到 MongoDB**，启动核心服务时以 MongoDB + Redis + Pulsar + etcd 为准。
+> **说明**：基础设施见 `deploy/depend/docker-compose.yaml`，MongoDB 使用官方 `mongo:8.0` standalone（配置 `deploy/depend/mongo/conf/mongod.conf`，首次启动自动创建管理员 `admin/admin`）。连接串：`mongodb://admin:admin@mongo:27017/?authSource=admin`（宿主机端口 `37017`）。
 
 ## 基本功能
 
 ### 限价单
-![img.png](img.png)
+![img.png](images/img.png)
 
 
 ### 市价单
-![img_1.png](img_1.png)
-## 运行项目
+![img_1.png](images/img_1.png)
 
-### 1. 本地编译（示例）
+## 部署
+
+推荐使用 Docker Compose 分两步启动：**先基础设施，再业务服务**。对应 Makefile 中的 `dep` 与 `start` 两个目标。
+
+### 前置要求
+
+- Docker 与 Docker Compose
+- Make（Linux / macOS / WSL 环境；Windows 建议使用 WSL 或 Git Bash）
+- Go 1.21+（`make start` 会在宿主机交叉编译 Linux 二进制）
+
+### 1. 启动基础设施
+
+```shell
+make dep
+```
+
+该命令会：
+
+- 创建 Docker 网络 `gex`（若不存在）
+- 启动 `deploy/depend/docker-compose.yaml` 中的中间件：MongoDB、Redis、Pulsar、Etcd、Nginx、WebSocket 等
+- 自动执行 MongoDB 初始化、Pulsar Topic 创建、Redis 测试账户资产写入
+
+宿主机映射端口见上文「中间件依赖」；Nginx 监听 `80`，MongoDB `37017`，Redis `16379`，Pulsar `16650`，Etcd `12379`。
+
+### 2. 编译并启动业务服务
+
+```shell
+make start
+```
+
+该命令会：
+
+- 交叉编译 `gateway`、`accountrpc`、`match`、`quoterpc` 四个服务到 `bin/`
+- 构建镜像并启动 `deploy/dockerfiles/docker-compose.yaml` 中的业务容器
+
+| 服务 | 容器名 | 端口 |
+| --- | --- | --- |
+| Gateway | `gex-gateway` | 8888 |
+| Account RPC | `gex-accountrpc` | 20002 |
+| Match | `gex-match` | 20003 |
+| Quote RPC | `gex-quoterpc` | 20011 |
+
+容器内配置使用 `app/*/etc/*.prod.yaml`（中间件地址为 `gex-etcd`、`gex-redis` 等 Docker 服务名）。
+
+### 3. 访问与验证
+
+- HTTP API：Gateway `http://localhost:8888`，或通过 Nginx `http://localhost`
+- WebSocket 推送：`deploy/depend/ws`（Proxy `20067`，Socket `19992`）
+- 清理容器与数据：`make clean`
+
+更多细节见 [deploy/README.md](deploy/README.md)。
+
+## 运行项目（本地开发）
+
+### 1. 代码生成与编译
 
 ```shell
 # 生成 Gateway 代码（修改 .api 后）
@@ -76,29 +129,14 @@ make gapi
 make accountrpc
 make quoterpc
 
-# 编译各服务（可按需调整 Makefile，当前推荐二进制）
+# 编译各服务二进制
 go build -o bin/gateway ./app/gateway
 go build -o bin/accountrpc ./app/account/rpc
 go build -o bin/match ./app/match
 go build -o bin/quoterpc ./app/quote/rpc
 ```
 
-### 2. Docker Compose（可选）
-
-依赖与业务可分别使用：
-
-```shell
-docker network create gex   # 首次需要
-make dep1   # deploy/depend：MongoDB、Redis、Pulsar、etcd、nginx、ws 等
-make dep2   # deploy/dockerfiles：业务容器（若镜像与 Makefile 已同步）
-```
-
-`Makefile` 中的 `build` / `run` 目标仍指向旧的多服务二进制，**与当前目录结构可能不一致**；以实际上述四个 `app/`* 入口为准。
-
-### 3. 访问
-
-- Gateway 默认端口见 `app/gateway/etc/gateway.yaml`（如 `8888`）
-- 若使用 nginx 反代，可配置 `api.gex.com` 指向 Gateway
+本地开发使用 `app/*/etc/*.yaml`，连接 Docker 依赖的宿主机映射端口（见「中间件依赖」）。可先 `make dep` 只启动中间件，再在宿主机直接运行各服务二进制。
 
 ## Go 实践要点
 

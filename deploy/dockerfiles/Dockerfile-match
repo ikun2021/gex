@@ -1,4 +1,4 @@
-FROM docker.1panel.live/library/busybox
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/busybox:1.38.0
 WORKDIR /app
 COPY bin/match /app/match
-COPY deploy/config/match.yaml /app/match.yaml
+COPY app/match/etc/match.prod.yaml /app/match.yaml

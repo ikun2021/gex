@@ -10,7 +10,20 @@
 | `quoterpc` | 行情、K 线、深度 | 20011 |
 | `adminapi` | 管理后台 | 20015 |
 
-基础设施（`deploy/depend/docker-compose.yaml`）：Pulsar、Redis、Etcd、MongoDB、WebSocket Proxy/Socket、Nginx。
+基础设施（`deploy/depend/docker-compose.yaml`）：Pulsar、Redis、Etcd、MongoDB、WebSocket、Nginx。
+
+宿主机端口（避免与本地默认端口冲突，nginx 仍为 80）：
+
+| 服务 | 宿主机端口 |
+|------|------------|
+| Pulsar | 16650 / 18080 |
+| Pulsar Manager | 19527 / 17750 |
+| MongoDB | 37017（mongo） |
+| Redis | 16379 |
+| Etcd | 12379 / 12380 |
+| WS Proxy | 20067 / 20068 |
+| WS Socket | 19992 |
+| Nginx | 80 |
 
 ## 快速启动
 
@@ -34,7 +47,7 @@ docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --build
 
 ## 配置
 
-Docker 环境统一使用 `deploy/config/*.yaml`（服务名作为主机名：`redis`、`pulsar`、`etcd`、`mongo`）。
+Docker 环境统一使用 `app/*/etc/*.prod.yaml`（中间件地址为 `gex-etcd`、`gex-redis` 等容器名）。
 
 本地开发仍使用各模块 `app/*/etc/*.yaml`。
 

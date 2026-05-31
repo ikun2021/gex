@@ -1,5 +1,5 @@
-FROM docker.1panel.live/library/busybox
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/busybox:1.38.0
 WORKDIR /app
 COPY bin/gateway /app/gateway
-COPY deploy/config/gateway.yaml /app/gateway.yaml
+COPY app/gateway/etc/gateway.prod.yaml /app/gateway.yaml
 COPY common/errs/language /app/common/errs/language

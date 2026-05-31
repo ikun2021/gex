@@ -1,14 +1,15 @@
-Name: account.rpc
-ListenOn: 0.0.0.0:20002
-Timeout: 10000
-Mode: dev
+Name: quote.rpc
+ListenOn: 0.0.0.0:20011
 Etcd:
   Hosts:
     - gex-etcd:2379
-  Key: accountRpc
-JwtConf:
-  SignKey: 1c5c04d04fb6705557686aff34299f9c
-  ValidTime: 30d
+  Key: quote.rpc
+WsConf:
+  etcd:
+    Key: proxy
+    Hosts:
+      - gex-etcd:2379
+  NonBlock: true
 Symbol:
   - Name: IKUN_USDT
     Id: 1
@@ -41,6 +42,23 @@ Coin:
     Precision: 4
 
 
+MongoConf:
+  Uri: mongodb://admin:admin@gex-mongo:27017/?authSource=admin
+  Database: trade
+  KlineCollection: kline_history
+  TickCollection: tick
+  ConnectTimeoutSeconds: 10
+PulsarConfig:
+  hosts:
+    - gex-pulsar:6650
+
+RedisConf:
+  Host: gex-redis:6379
+  Type: node
+  Pass: "123456"
+  PingTimeout: 5s
+
+
 LoggerConfig:
   level: debug  #日志等级 debug info warn error
   stacktrace: true #默认为true 在error级别及以上显示堆栈
@@ -66,21 +84,3 @@ LoggerConfig:
 #    flushSec: 3 # 刷新间隔单位为秒 开发测试调小一点，生产环境调大一点
 #    maxCount: 20 #  最大缓存数量 达到刷新间隔或最大记录数 触发发送  开发测试调小一点，生产环境调大一点
 #    level: warn # 指定上报级别
-
-
-PulsarConfig:
-  hosts:
-    - gex-pulsar:6650
-RedisConf:
-  Host: gex-redis:6379
-  Type: node
-  Pass: "123456"
-  PingTimeout: 5s
-
-MongoConf:
-  Uri: mongodb://admin:admin@gex-mongo:27017/?authSource=admin
-  Database: trade
-  OrderFinalCollection: order_final
-  MatchTradeCollection: match_trade
-  UserCollection: user
-  ConnectTimeoutSeconds: 10

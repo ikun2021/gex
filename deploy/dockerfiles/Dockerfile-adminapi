@@ -1,4 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY bin/adminapi /app/adminapi
-COPY deploy/config/admin.yaml /app/admin.yaml

@@ -55,18 +55,7 @@ services:
     networks:
       - gex
 
-  adminapi:
-    build:
-      context: ../..
-      dockerfile: deploy/dockerfiles/Dockerfile-adminapi
-    image: gex/adminapi:latest
-    container_name: gex-adminapi
-    restart: unless-stopped
-    entrypoint: ["/app/adminapi", "-f", "/app/admin.yaml"]
-    ports:
-      - "20015:20015"
-    networks:
-      - gex
+
 
 networks:
   gex:

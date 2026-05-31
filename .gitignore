@@ -1,7 +1,7 @@
 .idea
 
 admin_template
-deploy/depend/mysql/data
+deploy/depend/mongo/data
 deploy/depend/nginx/log
 deploy/depend/pulsar/data
 deploy/depend/redis/data
