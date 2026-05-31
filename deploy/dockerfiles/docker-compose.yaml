@@ -1,103 +1,73 @@
+# 业务服务：需先启动 deploy/depend/docker-compose.yaml，并创建外部网络 gex
+# 构建：在项目根目录执行 make build && docker compose -f deploy/dockerfiles/docker-compose.yaml up -d --build
 version: "3.7"
-services:
 
-  accountapi:
-    build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-accountapi
-    container_name: accountapi
-    restart: unless-stopped
-    entrypoint: ["/app/accountapi","-f","/app/account.yaml"]
-    ports: # 映射端口
-      - "20014:20014"
-    networks:
-      - gex
+services:
   accountrpc:
     build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-accountrpc
-    container_name: accountrpc
+      context: ../..
+      dockerfile: deploy/dockerfiles/Dockerfile-accountrpc
+    image: gex/accountrpc:latest
+    container_name: gex-accountrpc
     restart: unless-stopped
-    entrypoint: ["/app/accountrpc","-f","/app/account.yaml"]
-    ports: # 映射端口
+    entrypoint: ["/app/accountrpc", "-f", "/app/account.rpc.yaml"]
+    ports:
       - "20002:20002"
     networks:
       - gex
-  matchmq:
+
+  match:
     build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-matchmq
-    container_name: matchmq
+      context: ../..
+      dockerfile: deploy/dockerfiles/Dockerfile-match
+    image: gex/match:latest
+    container_name: gex-match
     restart: unless-stopped
-    entrypoint: ["/app/matchmq","-f","/app/match.yaml"]
-    networks:
-      - gex
-  matchrpc:
-    build:
-      context: ../../
-      dockerfile:  ./deploy/dockerfiles/Dockerfile-matchrpc
-    container_name: matchrpc
-    restart: unless-stopped
-    entrypoint: ["/app/matchrpc","-f","/app/match.yaml"]
-    ports: # 映射端口
+    entrypoint: ["/app/match", "-f", "/app/match.yaml"]
+    ports:
       - "20003:20003"
     networks:
       - gex
-  adminapi:
+
+  quoterpc:
     build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-adminapi
-    container_name: adminapi
+      context: ../..
+      dockerfile: deploy/dockerfiles/Dockerfile-quoterpc
+    image: gex/quoterpc:latest
+    container_name: gex-quoterpc
     restart: unless-stopped
-    entrypoint: ["/app/adminapi","-f","/app/admin.yaml"]
-    ports: # 映射端口
-      - "20015:20015"
-    networks:
-      - gex
-  orderapi:
-    build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-orderapi
-    container_name: orderapi
-    restart: unless-stopped
-    entrypoint: ["/app/orderapi","-f","/app/order.yaml"]
-    ports: # 映射端口
-      - "20013:20013"
-    networks:
-      - gex
-  orderrpc:
-    build:
-      context: ../../
-      dockerfile:  ./deploy/dockerfiles/Dockerfile-orderrpc
-    container_name: orderrpc
-    restart: unless-stopped
-    entrypoint: ["/app/orderrpc","-f","/app/order.yaml"]
-    ports: # 映射端口
-      - "20001:20001"
-    networks:
-      - gex
-  quoteapi:
-    build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-quoteapi
-    container_name: quoteapi
-    restart: unless-stopped
-    entrypoint: ["/app/quoteapi","-f","/app/quote.yaml"]
-    ports: # 映射端口
+    entrypoint: ["/app/quoterpc", "-f", "/app/quote.rpc.yaml"]
+    ports:
       - "20011:20011"
     networks:
       - gex
-  klinerpc:
+
+  gateway:
     build:
-      context: ../../
-      dockerfile: ./deploy/dockerfiles/Dockerfile-klinerpc
-    container_name: klinerpc
+      context: ../..
+      dockerfile: deploy/dockerfiles/Dockerfile-gateway
+    image: gex/gateway:latest
+    container_name: gex-gateway
     restart: unless-stopped
-    entrypoint: ["/app/klinerpc","-f","/app/kline.yaml"]
-    ports: # 映射端口
-      - "20009:20009"
+    entrypoint: ["/app/gateway", "-f", "/app/gateway.yaml"]
+    ports:
+      - "8888:8888"
     networks:
       - gex
+
+  adminapi:
+    build:
+      context: ../..
+      dockerfile: deploy/dockerfiles/Dockerfile-adminapi
+    image: gex/adminapi:latest
+    container_name: gex-adminapi
+    restart: unless-stopped
+    entrypoint: ["/app/adminapi", "-f", "/app/admin.yaml"]
+    ports:
+      - "20015:20015"
+    networks:
+      - gex
+
 networks:
   gex:
     external: true

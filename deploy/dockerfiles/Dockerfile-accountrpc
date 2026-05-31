@@ -1,7 +1,4 @@
 FROM docker.1panel.live/library/busybox
 WORKDIR /app
-COPY ../../bin/accountrpc /app/accountrpc
-COPY ../../app/account/rpc/etc/account.yaml /app/account.yaml
-
-#dockerfile构建:COPY ADD 命令 复制的文件 已dockerfile文件为开始位置找 https://blog.csdn.net/Myuhua/article/details/107552813
-#docker-compose构建:  context: ../../ dockerfile中复制文件的位置基于docker-compose.yaml
+COPY bin/accountrpc /app/accountrpc
+COPY deploy/config/account.rpc.yaml /app/account.rpc.yaml

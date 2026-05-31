@@ -26,10 +26,6 @@ adminapi:
 admindoc:
 	goctl api plugin -plugin goctl-swagger="swagger -filename doc/admin.json -host api.gex.com" -api app/admin/api/desc/admin.api -dir .
 
-adminmodel:
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/admin?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql  -outPath=app/admin/api/internal/dao/admin/query -fieldMap="decimal:string;tinyint:int32;int:int32" -fieldSignable=true
-	softdeleted -p app/admin/api/internal/dao/model/*.go
-	gentool --dsn="root:root@tcp(192.168.2.159:3307)/trade?charset=utf8mb4&parseTime=True&loc=Local" --db=mysql --tables=matched_order  -outPath=app/admin/api/internal/dao/match/query -fieldMap="decimal:string;tinyint:int32;int:int64"
 matchmq:
 	#--go_out指定的路径和option go_package = "trade/common/proto/mq/match;proto"; 指定的路径一起决定文件生成的位置 这个路径trade/common/proto/mq/match也是别人导入时用到的路径。
 	protoc    -Icommon/proto -I./ --go_out=./ common/proto/mq/match/match.proto
@@ -57,16 +53,11 @@ clear:
 	rm -rf deploy/depend/mysql/data/*
 
 pre:
-	chmod +x ./bin/accountapi
 	chmod +x ./bin/accountrpc
+	chmod +x ./bin/match
+	chmod +x ./bin/quoterpc
+	chmod +x ./bin/gateway
 	chmod +x ./bin/adminapi
-	chmod +x ./bin/matchmq
-	chmod +x ./bin/matchrpc
-	chmod +x ./bin/orderapi
-	chmod +x ./bin/orderrpc
-	chmod +x ./bin/quoteapi
-	chmod +x ./bin/klinerpc
-	chmod +x ./deploy/depend/dtm/dtm
 	chmod +x ./deploy/depend/ws/proxy/proxy
 	chmod +x ./deploy/depend/ws/socket/socket
 
@@ -77,14 +68,10 @@ dep2:
 
 build:
 	go env -w GOOS=linux
-	go env -w  GOPROXY=https://goproxy.cn,direct
-	go env -w  CGO_ENABLED=0
-	go build  -ldflags="-s -w"  -o ./bin/accountapi ./app/account/api/account.go
+	go env -w GOPROXY=https://goproxy.cn,direct
+	go env -w CGO_ENABLED=0
 	go build -ldflags="-s -w" -o ./bin/accountrpc ./app/account/rpc/account.go
+	go build -ldflags="-s -w" -o ./bin/match ./app/match/match.go
+	go build -ldflags="-s -w" -o ./bin/quoterpc ./app/quote/rpc/quote.go
+	go build -ldflags="-s -w" -o ./bin/gateway ./app/gateway/gateway.go
 	go build -ldflags="-s -w" -o ./bin/adminapi ./app/admin/api/admin.go
-	go build -ldflags="-s -w" -o ./bin/matchmq ./app/match/mq/match.go
-	go build -ldflags="-s -w" -o ./bin/matchrpc ./app/match/rpc/match.go
-	go build -ldflags="-s -w" -o ./bin/orderapi ./app/order/api/order.go
-	go build -ldflags="-s -w" -o ./bin/orderrpc ./app/order/rpc/order.go
-	go build -ldflags="-s -w" -o ./bin/quoteapi ./app/quotes/api/quote.go
-	go build -ldflags="-s -w" -o ./bin/klinerpc ./app/quotes/kline/rpc/kline.go

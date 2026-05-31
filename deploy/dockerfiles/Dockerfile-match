@@ -1,0 +1,4 @@
+FROM docker.1panel.live/library/busybox
+WORKDIR /app
+COPY bin/match /app/match
+COPY deploy/config/match.yaml /app/match.yaml

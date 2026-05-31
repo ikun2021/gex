@@ -54,28 +54,25 @@ services:
       - "80:80"
     networks:
       - gex
-  mysql:
-    image: registry.cn-hangzhou.aliyuncs.com/zhengqing/mysql:8.0  # 原镜像`mysql:8.0`
-    container_name: mysql8                                    # 容器名为'mysql8'
-    restart: unless-stopped                                               # 指定容器退出后的重启策略为始终重启，但是不考虑在Docker守护进程启动时就已经停止了的容器
-    volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
-      - "./mysql/conf/my.cnf:/etc/mysql/my.cnf"
-      - "./mysql/data:/var/lib/mysql"
-      - "./mysql/mysql-files:/var/lib/mysql-files"
-      - "./mysql/init:/docker-entrypoint-initdb.d"
-    environment: # 设置环境变量,相当于docker run命令中的-e
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: unless-stopped
+    environment:
       TZ: Asia/Shanghai
-      LANG: en_US.UTF-8
-      MYSQL_ROOT_PASSWORD: root         # 设置root用户密码
-    ports: # 映射端口
-      - "3307:3307"
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - "./mongo/data:/data/db"
     networks:
       - gex
   redis:
     image: registry.cn-hangzhou.aliyuncs.com/zhengqing/redis:7.0.5                    # 镜像'redis:7.0.5'
     container_name: redis                                                             # 容器名为'redis'
     restart: unless-stopped                                                                   # 指定容器退出后的重启策略为始终重启，但是不考虑在Docker守护进程启动时就已经停止了的容器
-    command: redis-server /etc/redis/redis.conf   # 启动redis服务并添加密码为：123456,默认不开启redis-aof方式持久化配置
+    command: redis-server /etc/redis/redis.conf   # 启动redis服务，默认无密码
     #    command: redis-server --requirepass 123456 --appendonly yes # 启动redis服务并添加密码为：123456,并开启redis持久化配置
     environment: # 设置环境变量,相当于docker run命令中的-e
       TZ: Asia/Shanghai
@@ -120,20 +117,6 @@ services:
       - "9992:9992"
     volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
       - "./ws/socket/config-deploy.toml:/app/config.toml"
-    networks:
-      - gex
-  dtm:
-    build:
-      dockerfile: ./dtm/Dockerfile
-    container_name: dtm
-    restart: unless-stopped
-    entrypoint: [ "/app/dtm","-c","/app/conf.yml" ]
-    ports: # 映射端口
-      - "36789:36789"
-      - "36790:36790"
-      - "36791:36791"
-    volumes: # 数据卷挂载路径设置,将本机目录映射到容器目录
-      - "./dtm/conf.yml:/app/conf.yml"
     networks:
       - gex
 networks:

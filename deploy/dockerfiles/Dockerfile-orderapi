@@ -1,5 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY ../../bin/orderapi /app/orderapi
-COPY ../../app/order/api/etc/order.yaml /app/order.yaml
-

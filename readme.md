@@ -1,7 +1,5 @@
 # go 微服务实践 — 基于 go-zero 的数字货币现货交易平台
 
-> **本项目使用 AI（Cursor Agent）对原始仓库进行了大规模重构。**
-
 - 后端：[https://github.com/ikun2021/gex](https://github.com/ikun2021/gex)
 - 前端：[https://github.com/ikun2021/gex-ui](https://github.com/ikun2021/gex-ui)
 
@@ -11,20 +9,6 @@
 - 行情（盘口、K 线、Tick、Ticker）与个人订单变更的实时推送
 
 ## AI 重构概览
-
-本仓库基于原项目，通过 **Cursor Agent** 驱动完成了以下重构：
-
-
-| 重构项        | 原方案                               | 现方案                                                      |
-| ---------- | --------------------------------- | -------------------------------------------------------- |
-| 服务数量       | ~10 个独立 API / RPC / MQ            | 4 个核心进程                                                  |
-| 主数据库       | MySQL + gorm/gen                  | **MongoDB**                                              |
-| 分布式事务      | DTM Saga                          | **Redis Lua 原子脚本**                                       |
-| 撮合引擎快照     | JSON 序列化（Pulsar MessageID 反序列化失败） | **base64(Serialize) + 兼容旧格式**                            |
-| 用户认证       | 旧 session / 硬编码                   | **JWT + Redis 单点会话**                                     |
-| Gateway 鉴权 | 无 / 分散                            | **统一 Auth 中间件**（Bearer Token → AccountRpc.ValidateToken） |
-| 行情接口       | 各服务独立暴露                           | Gateway 统一转发 QuoteRpc                                    |
-
 
 ## 架构说明
 
@@ -37,8 +21,6 @@
 | **Account RPC** | `app/account/rpc` | 用户认证、资产（Redis）、订单与成交归档（MongoDB）              |
 | **Match**       | `app/match`       | 撮合引擎，消费 Pulsar 订单流，盘口与快照存 Redis              |
 | **Quote RPC**   | `app/quote/rpc`   | K 线 / Tick / Ticker，持久化 MongoDB，推送 WebSocket |
-
-
 
 
 ```mermaid
@@ -60,8 +42,6 @@ flowchart LR
 
 
 
-
-
 ## 中间件依赖
 
 核心链路依赖：
@@ -79,13 +59,11 @@ flowchart LR
 ## 基本功能
 
 ### 限价单
-
+![img.png](img.png)
 
 
 ### 市价单
-
-
-
+![img_1.png](img_1.png)
 ## 运行项目
 
 ### 1. 本地编译（示例）
@@ -137,9 +115,8 @@ Gateway 使用 `.api` 定义 HTTP，通过 etcd 发现 `AccountRpc`、`MatchRpc`
 ### Redis 资产与撮合状态
 
 - 用户资产：Hash + Lua 脚本保证冻结/解冻/扣减原子性
-- 登录会话：JWT + Redis 单点（`gex:account:session:*`）
+- 登录会话：JWT + Redis 单点（`gex:account:session:`*）
 - 撮合：订单簿与引擎快照
 
 ---
 
-*本项目的架构重构、存储迁移、认证系统及 Bug 修复均由 AI（Cursor Agent）辅助完成。*

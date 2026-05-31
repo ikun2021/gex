@@ -1,0 +1,20 @@
+Name: AdminApi
+Host: 0.0.0.0
+Port: 20015
+TimeOut: 1000000
+
+EtcdConf:
+  Endpoints:
+    - etcd:2379
+  DialTimeout: 3
+
+LoggerConfig:
+  level: info
+  stacktrace: true
+  addCaller: true
+  callerShip: 1
+  mode: console
+  json: false
+  color: false
+  isReport: false
+  port: 0

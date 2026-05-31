@@ -166,6 +166,7 @@ func (d *DepthHandler) handeUpdateDepth() {
 			if par.side == enum.Side_Sell && changedPosition != nil {
 				d.asksChangedPosition[par.p.price.String()] = changedPosition.castToPosition(d.symbolInfo.BaseCoinPrec, d.symbolInfo.QuoteCoinPrec)
 			}
+			d.lastVersion = d.currentVersion
 			d.currentVersion = par.version
 		case <-d.t.C:
 			//定时发送改变的档位前端及时更新
@@ -197,7 +198,6 @@ func (d *DepthHandler) handeUpdateDepth() {
 			d.ChangedPosition <- depthData
 			d.bidsChangedPosition = make(map[string]*Position, 10)
 			d.asksChangedPosition = make(map[string]*Position, 10)
-			d.lastVersion = d.currentVersion
 		}
 	}
 
@@ -243,7 +243,7 @@ func (d *DepthHandler) GetDepth(level int32) DepthData {
 	}
 	depthData.Bids = b
 	depthData.Asks = a
-	depthData.CurrentVersion = d.lastVersion
+	depthData.CurrentVersion = d.currentVersion
 	return depthData
 }
 

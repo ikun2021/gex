@@ -1,5 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY ../../bin/matchrpc /app/matchrpc
-COPY ../../app/match/rpc/etc/match.yaml /app/match.yaml
-

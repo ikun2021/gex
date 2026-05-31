@@ -1,0 +1,5 @@
+FROM docker.1panel.live/library/busybox
+WORKDIR /app
+COPY bin/gateway /app/gateway
+COPY deploy/config/gateway.yaml /app/gateway.yaml
+COPY common/errs/language /app/common/errs/language

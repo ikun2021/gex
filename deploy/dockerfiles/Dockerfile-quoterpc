@@ -1,0 +1,4 @@
+FROM docker.1panel.live/library/busybox
+WORKDIR /app
+COPY bin/quoterpc /app/quoterpc
+COPY deploy/config/quote.rpc.yaml /app/quote.rpc.yaml

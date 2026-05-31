@@ -1,5 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY ../../bin/quoteapi /app/quoteapi
-COPY ../../app/quotes/api/etc/quote.yaml /app/quote.yaml
-

@@ -1,5 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY ../../bin/orderrpc /app/orderrpc
-COPY ../../app/order/rpc/etc/order.yaml /app/order.yaml
-

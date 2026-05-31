@@ -1,4 +1,0 @@
-FROM docker.1panel.live/library/busybox
-WORKDIR /app
-COPY ../../bin/klinerpc /app/klinerpc
-COPY ../../app/quotes/kline/rpc/etc/kline.yaml /app/kline.yaml

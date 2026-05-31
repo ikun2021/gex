@@ -1,6 +1,4 @@
 FROM docker.1panel.live/library/busybox
 WORKDIR /app
-COPY ../../bin/adminapi /app/adminapi
-COPY ../../app/admin/api/etc/admin.yaml /app/admin.yaml
-
-#COPY ADD 命令 复制的文件 已dockerfile文件为开始位置找 https://blog.csdn.net/Myuhua/article/details/107552813
+COPY bin/adminapi /app/adminapi
+COPY deploy/config/admin.yaml /app/admin.yaml
