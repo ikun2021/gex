@@ -3,7 +3,7 @@
 package errs
 
 const (
-	InternalCode = CommonCodeInit + iota + 1
+	InternalCode Code = CommonCodeInit + iota + 1
 	RedisErrCode
 	ExecSqlFailedCode
 	ParamValidateFailedCode

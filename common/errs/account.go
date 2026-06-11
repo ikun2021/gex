@@ -4,7 +4,7 @@ package errs
 
 const (
 	// UserNotFoundCodeCode  用户不存在
-	UserNotFoundCode = AccountCodeInit + iota + 1
+	UserNotFoundCode Code = AccountCodeInit + iota + 1
 	// AmountInsufficientCode 用户余额不足
 	AmountInsufficientCode
 	// TokenValidateFailedCode token验证失败
